@@ -3,7 +3,19 @@ import re
 from src.models import RetrievedChunk, SourceCitation
 
 
-SOURCE_MARKER_PATTERN = re.compile(r"\[Source\s+(\d+)\]", re.IGNORECASE)
+# Matches bracketed citation groups such as:
+# [Source 1]
+# [Source 1, Source 2]
+# [Source 1, 2]
+# [Sources 1 and 2]
+#
+# The actual number extraction is done separately so that combined markers work.
+SOURCE_MARKER_PATTERN = re.compile(
+    r"\[\s*Sources?\s+(?P<body>[^\]]+)\]",
+    re.IGNORECASE,
+)
+
+SOURCE_NUMBER_PATTERN = re.compile(r"\d+")
 
 
 def build_source_citations(chunks: list[RetrievedChunk]) -> list[SourceCitation]:
@@ -36,29 +48,37 @@ def extract_source_numbers(answer: str) -> list[int]:
     """
     Extract source numbers referenced in an answer.
 
-    Example:
-        "Recursion means a function calls itself. [Source 1]"
+    Supports formats such as:
+        [Source 1]
+        [Source 1, Source 2]
+        [Source 1, 2]
+        [Sources 1 and 2]
+        [Source 3, Source 4]
 
     Returns:
-        [1]
+        A sorted list of unique source numbers.
+
+    Example:
+        "BERT uses bidirectional attention [Source 3, Source 4]."
+
+    Returns:
+        [3, 4]
     """
 
-    source_numbers: list[int] = []
-    seen: set[int] = set()
+    source_numbers: set[int] = set()
 
-    for match in SOURCE_MARKER_PATTERN.finditer(answer):
-        source_number = int(match.group(1))
+    for marker_match in SOURCE_MARKER_PATTERN.finditer(answer):
+        marker_body = marker_match.group("body")
 
-        if source_number not in seen:
-            seen.add(source_number)
-            source_numbers.append(source_number)
+        for number_match in SOURCE_NUMBER_PATTERN.finditer(marker_body):
+            source_numbers.add(int(number_match.group()))
 
-    return source_numbers
+    return sorted(source_numbers)
 
 
 def answer_has_source_markers(answer: str) -> bool:
     """
-    Return True if the answer contains at least one [Source N] marker.
+    Return True if the answer contains at least one source marker.
     """
 
     return bool(extract_source_numbers(answer))
@@ -73,6 +93,8 @@ def select_citations_referenced_in_answer(
 
     If the answer cites [Source 2], this returns the SourceCitation with
     source_number == 2.
+
+    Combined markers such as [Source 1, Source 2] are also supported.
     """
 
     referenced_numbers = extract_source_numbers(answer)

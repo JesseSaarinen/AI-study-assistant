@@ -1,3 +1,5 @@
+import pytest
+
 from src.citations import (
     answer_has_source_markers,
     build_source_citations,
@@ -47,16 +49,71 @@ def test_build_source_citations_assigns_source_numbers() -> None:
     assert citations[1].page_number == 5
 
 
-def test_extract_source_numbers_preserves_first_seen_order() -> None:
-    answer = "First claim [Source 2]. Second claim [Source 1]. Again [Source 2]."
+@pytest.mark.parametrize(
+    ("answer", "expected_source_numbers"),
+    [
+        (
+            "Recursion is when a function calls itself. [Source 1]",
+            [1],
+        ),
+        (
+            "BERT uses bidirectional attention. [Source 1, Source 2]",
+            [1, 2],
+        ),
+        (
+            "BERT uses bidirectional attention. [Source 1, 2]",
+            [1, 2],
+        ),
+        (
+            "BERT and GPT use different Transformer architectures. [Sources 1 and 2]",
+            [1, 2],
+        ),
+        (
+            "BERT is encoder-only and GPT is decoder-only. [Source 3, Source 4]",
+            [3, 4],
+        ),
+        (
+            "Multiple adjacent markers are also valid. [Source 1][Source 2]",
+            [1, 2],
+        ),
+        (
+            "Lowercase markers should also work. [source 2, source 4]",
+            [2, 4],
+        ),
+    ],
+)
+def test_extract_source_numbers_supports_common_marker_formats(
+    answer: str,
+    expected_source_numbers: list[int],
+) -> None:
+    assert extract_source_numbers(answer) == expected_source_numbers
+
+
+def test_extract_source_numbers_returns_unique_sorted_numbers() -> None:
+    answer = (
+        "First claim [Source 3]. "
+        "Second claim [Source 1]. "
+        "Repeated source [Source 3]. "
+        "Combined source marker [Sources 2 and 1]."
+    )
 
     source_numbers = extract_source_numbers(answer)
 
-    assert source_numbers == [2, 1]
+    assert source_numbers == [1, 2, 3]
+
+
+def test_extract_source_numbers_returns_empty_list_when_no_markers() -> None:
+    answer = "This answer has no source markers."
+
+    source_numbers = extract_source_numbers(answer)
+
+    assert source_numbers == []
 
 
 def test_answer_has_source_markers() -> None:
     assert answer_has_source_markers("This is supported. [Source 1]")
+    assert answer_has_source_markers("This is supported. [Source 1, Source 2]")
+    assert answer_has_source_markers("This is supported. [Sources 1 and 2]")
     assert not answer_has_source_markers("This answer has no markers.")
 
 
@@ -73,7 +130,24 @@ def test_select_citations_referenced_in_answer() -> None:
         citations=citations,
     )
 
-    assert [citation.source_number for citation in selected] == [3, 1]
+    assert [citation.source_number for citation in selected] == [1, 3]
+
+
+def test_select_citations_referenced_in_answer_handles_combined_markers() -> None:
+    chunks = [
+        make_retrieved_chunk("chunk_1"),
+        make_retrieved_chunk("chunk_2"),
+        make_retrieved_chunk("chunk_3"),
+        make_retrieved_chunk("chunk_4"),
+    ]
+    citations = build_source_citations(chunks)
+
+    selected = select_citations_referenced_in_answer(
+        answer="This uses combined markers. [Source 3, Source 4]",
+        citations=citations,
+    )
+
+    assert [citation.source_number for citation in selected] == [3, 4]
 
 
 def test_get_citations_to_display_returns_referenced_citations_when_present() -> None:
@@ -90,6 +164,23 @@ def test_get_citations_to_display_returns_referenced_citations_when_present() ->
 
     assert len(displayed) == 1
     assert displayed[0].source_number == 2
+
+
+def test_get_citations_to_display_handles_combined_markers() -> None:
+    chunks = [
+        make_retrieved_chunk("chunk_1"),
+        make_retrieved_chunk("chunk_2"),
+        make_retrieved_chunk("chunk_3"),
+        make_retrieved_chunk("chunk_4"),
+    ]
+    citations = build_source_citations(chunks)
+
+    displayed = get_citations_to_display(
+        answer="This answer uses multiple sources. [Source 1, Source 4]",
+        citations=citations,
+    )
+
+    assert [citation.source_number for citation in displayed] == [1, 4]
 
 
 def test_get_citations_to_display_returns_all_when_answer_has_no_markers() -> None:
@@ -167,3 +258,20 @@ def test_ensure_answer_has_citation_markers_does_not_duplicate_existing_marker()
     )
 
     assert answer == "Recursion is when a function calls itself. [Source 1]"
+
+
+def test_ensure_answer_has_citation_markers_does_not_duplicate_combined_markers() -> None:
+    chunks = [
+        make_retrieved_chunk("chunk_1"),
+        make_retrieved_chunk("chunk_2"),
+    ]
+    citations = build_source_citations(chunks)
+
+    original_answer = "BERT uses bidirectional attention. [Source 1, Source 2]"
+
+    answer = ensure_answer_has_citation_markers(
+        answer=original_answer,
+        citations=citations,
+    )
+
+    assert answer == original_answer

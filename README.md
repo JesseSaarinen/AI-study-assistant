@@ -1,8 +1,18 @@
 # AI Study Assistant for University Notes
 
-A retrieval-augmented generation, or RAG, web application that allows students to upload university lecture notes as PDFs and ask questions grounded in the uploaded material.
+A retrieval-augmented generation (RAG) web application that lets students upload university lecture notes as PDFs and ask questions grounded in the uploaded material.
 
 The app extracts text from PDFs, chunks the text, generates local embeddings with Sentence Transformers, stores them in ChromaDB, retrieves relevant chunks for each question, and uses an OpenAI-compatible chat model to generate answers with source citations.
+
+## Screenshots
+
+### Asking a question with source citations
+
+![Answer with citations](docs/AI-assistant-answer-example.png)
+
+### Uploading and processing PDF notes
+
+![Upload and processing](docs/AI-assistant-uploadfile-example.png)
 
 ## Project Overview
 
@@ -25,9 +35,9 @@ I could not find this in the uploaded notes.
 - Store embeddings, text, and metadata in ChromaDB
 - Ask natural language questions about uploaded notes
 - Retrieve semantically relevant chunks from the vector database
-- Generate grounded answers using an OpenAI-compatible chat model
-- Display source citations with file names and page numbers
-- Fallback response when the answer is not found in the notes
+- Generate grounded answers using any OpenAI-compatible chat model (OpenAI, Gemini, Groq, Ollama)
+- Answer only from your uploaded notes, and say so when something cannot be found
+- Display source citations with file names, page numbers, and retrieved chunk text
 - Retrieval distance filtering to reduce weak or irrelevant matches
 - Streamlit web interface with:
   - end-to-end PDF processing
@@ -89,13 +99,16 @@ This helps the model produce answers that are more grounded, traceable, and rele
 ## Project Structure
 
 ```text
-ai-study-assistant/
+AI-study-assistant/
 ├── app.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
 ├── pytest.ini
 ├── README.md
+├── docs/
+│   ├── AI-assistant-answer-example.png
+│   └── AI-assistant-uploadfile-example.png
 ├── storage/
 │   └── .gitkeep
 ├── src/
@@ -111,7 +124,6 @@ ai-study-assistant/
 │   ├── ui_helpers.py
 │   └── vector_store.py
 └── tests/
-    ├── __init__.py
     ├── helpers.py
     ├── test_chunker.py
     ├── test_citations.py
@@ -135,8 +147,8 @@ ai-study-assistant/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/ai-study-assistant.git
-cd ai-study-assistant
+git clone https://github.com/JesseSaarinen/AI-study-assistant.git
+cd AI-study-assistant
 ```
 
 ### 2. Create a virtual environment
@@ -173,6 +185,8 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+The first install can take several minutes because `sentence-transformers` depends on PyTorch.
 
 ### 4. Create your environment file
 
@@ -214,6 +228,19 @@ MAX_UPLOADED_FILE_MB=50
 
 Do not commit your real `.env` file to GitHub.
 
+### Using other LLM providers
+
+The chat model is accessed through the OpenAI Python client, so any OpenAI-compatible API works. The variable names start with `OPENAI_` for that reason. Change these values in `.env`:
+
+| Provider | `OPENAI_BASE_URL` | Example `OPENAI_MODEL` |
+|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-3.5-flash-lite` |
+| Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| Ollama (local) | `http://localhost:11434/v1` | `llama3.2` |
+
+Gemini and Groq both offer free tiers. For Ollama, install it locally, pull a model, and set `OPENAI_API_KEY` to any non-empty value such as `ollama`. Model names change often, so check your provider's current model list.
+
 ## Running the App
 
 From the project root:
@@ -247,6 +274,8 @@ The app will:
 3. Generate embeddings
 4. Store embeddings in ChromaDB
 
+The first run downloads the embedding model, so it may take a little longer.
+
 ### 2. Inspect Data
 
 Go to the **Inspect data** tab.
@@ -267,12 +296,12 @@ Go to the **Ask questions** tab.
 Ask a question such as:
 
 ```text
-What is dynamic programming?
+What is the difference between BERT and GPT?
 ```
 
-The assistant will retrieve relevant chunks from your notes and generate an answer using only those chunks.
+The assistant retrieves relevant chunks from your notes and generates an answer using only those chunks.
 
-If the answer is not found, it should respond:
+If the answer is not found, it responds:
 
 ```text
 I could not find this in the uploaded notes.
@@ -283,7 +312,7 @@ I could not find this in the uploaded notes.
 Answers include source markers such as:
 
 ```text
-Dynamic programming stores previous subproblem results to avoid repeated computation. [Source 1]
+GPT uses a decoder-only Transformer with causal attention. [Source 2]
 ```
 
 The app displays each source with:
@@ -298,10 +327,10 @@ The app displays each source with:
 Example:
 
 ```text
-[Source 1] algorithms_week_4.pdf, page 12
+[Source 2] lecture_notes.pdf, page 46
 ```
 
-This makes answers traceable back to the uploaded notes.
+Sources the answer actually relied on are marked as cited, which makes answers traceable back to the uploaded notes.
 
 ## Testing
 
@@ -317,14 +346,7 @@ Run tests with coverage:
 pytest --cov=src --cov-report=term-missing
 ```
 
-Current tested status:
-
-```text
-79 passed
-82% coverage
-```
-
-The tests cover:
+The tests run without external API calls and cover:
 
 - PDF extraction
 - PDF error handling
@@ -337,8 +359,8 @@ The tests cover:
 - retrieval filtering
 - prompt construction
 - RAG fallback behaviour
-- citation formatting
-- end-to-end local RAG pipeline without external API calls
+- citation parsing and formatting, including combined markers such as `[Source 1, Source 2]`
+- end-to-end local RAG pipeline
 
 ## Configuration
 
@@ -388,6 +410,8 @@ To disable retrieval filtering:
 RETRIEVAL_DISTANCE_THRESHOLD=disabled
 ```
 
+The right value depends on your documents and embedding model, so the distance of each retrieved chunk is shown in the UI to help with tuning.
+
 ## Error Handling
 
 The app handles common issues such as:
@@ -410,11 +434,13 @@ This is an MVP and has some limitations:
 
 - It only works well with PDFs containing selectable text.
 - Scanned PDFs require OCR, which is not included.
+- The default embedding model is English-focused. For notes in other languages such as Finnish, set `EMBEDDING_MODEL_NAME` to a multilingual model like `paraphrase-multilingual-MiniLM-L12-v2` and re-process your PDFs.
+- Slide decks produce short chunks, and repeated headers or footers can add noise to retrieval.
 - Citation accuracy depends on the quality of retrieved chunks.
 - The LLM may still occasionally produce imperfect answers.
 - The app currently uses one ChromaDB collection by default.
 - There is no user authentication.
-- Uploaded documents are processed locally during the Streamlit session.
+- Uploaded documents are processed locally, but the retrieved text is sent to the configured chat API provider.
 - Very large PDFs may be slow to process.
 - Tables, diagrams, formulas, and images are not deeply interpreted.
 
@@ -423,6 +449,7 @@ This is an MVP and has some limitations:
 Potential improvements include:
 
 - OCR support for scanned PDFs
+- removing repeated headers and footers from slide decks
 - multi-user accounts
 - separate collections per subject/module
 - document deletion from ChromaDB
@@ -443,7 +470,7 @@ Potential improvements include:
 - `.env` should never be committed to GitHub.
 - Local ChromaDB files are stored in `storage/chroma`.
 - The local vector database is ignored by Git.
-- Uploaded PDFs should be treated as private study material.
+- Uploaded PDFs should be treated as private study material and are not stored in the repository.
 
 ## Why This Project Is Useful
 
@@ -451,7 +478,7 @@ This project demonstrates practical AI engineering skills:
 
 - building a complete RAG pipeline
 - working with embeddings and vector databases
-- integrating LLM APIs
+- integrating LLM APIs in a provider-independent way
 - designing a usable Streamlit interface
 - handling real-world document processing problems
 - writing modular, testable Python code

@@ -15,9 +15,12 @@ Rules:
 3. If the answer is not clearly present in the provided context, say exactly:
    "{ANSWER_NOT_FOUND}"
 4. If you answer, cite the relevant source using source markers like [Source 1].
-5. Put source markers directly after the sentence or paragraph they support.
-6. Do not cite sources that do not support the answer.
-7. Keep answers clear, concise, and suitable for a university student.
+5. If a sentence is supported by multiple sources, use separate adjacent markers:
+   Correct: [Source 1][Source 2]
+   Avoid: [Source 1, Source 2]
+6. Put source markers directly after the sentence or paragraph they support.
+7. Do not cite sources that do not support the answer.
+8. Keep answers clear, concise, and suitable for a university student.
 """.strip()
 
 
@@ -69,6 +72,9 @@ Answering instructions:
 - If the context does not contain the answer, say exactly:
   "{ANSWER_NOT_FOUND}"
 - If you answer, include source markers such as [Source 1] or [Source 2].
+- If multiple sources support the same sentence, use separate adjacent markers:
+  Correct: [Source 1][Source 2]
+  Avoid: [Source 1, Source 2]
 - Place source markers after the claims they support.
 - Do not mention sources that are irrelevant.
 """.strip()
