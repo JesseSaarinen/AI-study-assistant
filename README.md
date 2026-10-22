@@ -22,7 +22,7 @@ It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB,
 - **Measured, not guessed.** A labelled question set and an evaluation script compare embedding models, chunk sizes and distance thresholds, and the results set the app's defaults. A second script grades the answers themselves: refusals, citations, and an LLM judge for faithfulness. [Retrieval results](#retrieval-evaluation) and [answer evaluation](#answer-evaluation) below.
 - **Light enough for free hosting.** Embeddings run on ONNX Runtime through FastEmbed, so the install is about 1 GB instead of 6.6 GB with PyTorch.
 - **Ready for a public demo.** Bundled sample notes, one-click example questions, and a demo mode that isolates each visitor's notes and caps API usage.
-- **Tested.** 183 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
+- **Tested.** 183 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff, the tests and a Docker build with a start-up check on every pull request and every push to `main`.
 
 ## How it works
 
@@ -77,6 +77,30 @@ streamlit run app.py
 ```
 
 Open http://localhost:8501 and click **Try with sample notes**, or upload your own PDFs.
+
+### Run with Docker
+
+```bash
+cp .env.example .env             # then add your API key
+docker compose up --build
+```
+
+Open http://localhost:8501. The image already contains the embedding model, so nothing is downloaded when the app starts, and processed notes are kept in a Docker volume between restarts. The app runs as a non-root user and the container reports its health through Streamlit's health endpoint.
+
+To keep everything on your own machine, run the chat model in [Ollama](https://ollama.com) next to the app. Set these values in `.env`:
+
+```bash
+OPENAI_BASE_URL=http://ollama:11434/v1
+OPENAI_API_KEY=ollama
+OPENAI_MODEL=llama3.2
+```
+
+Then start both containers and download the model once:
+
+```bash
+docker compose --profile ollama up --build -d
+docker compose exec ollama ollama pull llama3.2
+```
 
 ### Choosing a chat provider
 
@@ -181,6 +205,8 @@ AI-study-assistant/
 ├── sample_data/            # bundled sample lecture notes (PDF)
 ├── docs/                   # deployment guide and screenshots
 ├── .github/workflows/      # CI, retrieval evaluation and answer evaluation
+├── Dockerfile              # app image with the embedding model built in
+├── docker-compose.yml      # the app, plus an optional Ollama container
 ├── requirements.txt        # runtime dependencies
 ├── requirements-dev.txt    # adds pytest and ruff
 └── pyproject.toml          # pytest, coverage and ruff settings
@@ -232,7 +258,7 @@ The app deploys for free on Streamlit Community Cloud with a free Gemini or Groq
 - **Retrieval is vector only.** Hybrid keyword and vector search, or a reranker, would help with exact terms such as course codes.
 - **The evaluation is small.** 38 questions on one short document, written by the same author as the notes, so the numbers are optimistic.
 - **The judge is a language model.** By default it is the same model that wrote the answers, which tends to grade its own output generously. `--judge-model` lets a different model grade, and the report lists every flagged answer so the verdicts can be checked by hand.
-- **Privacy.** Retrieved note text is sent to the configured chat provider. Use Ollama to keep everything on your machine.
+- **Privacy.** Retrieved note text is sent to the configured chat provider. Use Ollama, for example through the Docker Compose `ollama` profile, to keep everything on your machine.
 - **Single user locally.** There are no accounts, and outside demo mode all notes share one collection.
 
 Ideas for next steps: OCR for scanned notes, separate collections per course, deleting single documents, and spaced repetition for quiz questions answered wrong.
