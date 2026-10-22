@@ -3,12 +3,13 @@
 [![CI](https://github.com/JesseSaarinen/AI-study-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/JesseSaarinen/AI-study-assistant/actions/workflows/ci.yml)
 [![Retrieval evaluation](https://github.com/JesseSaarinen/AI-study-assistant/actions/workflows/evaluation.yml/badge.svg)](https://github.com/JesseSaarinen/AI-study-assistant/actions/workflows/evaluation.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+[![Live demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ai-study-assistant-jesse.streamlit.app)
 
 Ask questions about your own lecture notes and get answers that cite the exact PDF page they came from. When the notes do not contain the answer, the assistant says so instead of guessing.
 
 It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB, FastEmbed and any OpenAI-compatible chat API, including free tiers from Gemini and Groq.
 
-<!-- Add the live demo link here once it is deployed, see docs/DEPLOYMENT.md -->
+**[Try the live demo](https://ai-study-assistant-jesse.streamlit.app)**: click **Try with sample notes**, then pick an example question. No account or API key needed. The app may take a minute to wake up if nobody has used it recently.
 
 ![Answer with citations](docs/AI-assistant-answer-example.png)
 
