@@ -1,6 +1,6 @@
 import pytest
 
-from src.config import AppConfig, get_config
+from src.config import DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD, AppConfig, get_config
 
 
 def test_app_config_can_be_created() -> None:
@@ -131,3 +131,12 @@ def test_get_config_rejects_invalid_demo_max_questions(monkeypatch) -> None:
 
     with pytest.raises(ValueError):
         get_config()
+
+
+def test_get_config_uses_evaluated_default_threshold(monkeypatch) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.delenv("RETRIEVAL_DISTANCE_THRESHOLD", raising=False)
+
+    config = get_config()
+
+    assert config.retrieval_distance_threshold == DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD

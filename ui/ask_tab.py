@@ -87,7 +87,7 @@ def display_example_questions() -> str | None:
 
     for column, sample_question in zip(columns, SAMPLE_QUESTIONS, strict=True):
         with column:
-            if st.button(sample_question, use_container_width=True):
+            if st.button(sample_question):
                 clicked_question = sample_question
 
     return clicked_question

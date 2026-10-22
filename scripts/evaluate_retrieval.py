@@ -56,6 +56,12 @@ def parse_args() -> argparse.Namespace:
         "--pdf", type=Path, default=REPO_ROOT / "sample_data" / "dsa_lecture_notes.pdf"
     )
     parser.add_argument("--output", type=Path, default=REPO_ROOT / "eval" / "results.md")
+    parser.add_argument(
+        "--fail-under",
+        type=float,
+        default=None,
+        help="Exit with an error if Hit@1 for the app default configuration is below this share.",
+    )
 
     return parser.parse_args()
 
@@ -176,6 +182,7 @@ def main() -> None:
     runs = []
     thresholds_by_model = {}
     misses: list[QuestionResult] = []
+    default_hit_rate: float | None = None
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for model_name in args.models:
@@ -206,6 +213,7 @@ def main() -> None:
                     )
 
                     if model_name == APP_DEFAULT_MODEL:
+                        default_hit_rate = hit_rate(results, 1)
                         misses = [
                             result
                             for result in results
@@ -217,6 +225,18 @@ def main() -> None:
     args.output.write_text(report, encoding="utf-8")
     print(f"\nWrote {args.output}\n")
     print(report)
+
+    below_target = (
+        args.fail_under is not None
+        and default_hit_rate is not None
+        and default_hit_rate < args.fail_under
+    )
+
+    if below_target:
+        sys.exit(
+            f"Hit@1 for the app default is {percent(default_hit_rate)}, "
+            f"below the required {percent(args.fail_under)}."
+        )
 
 
 if __name__ == "__main__":

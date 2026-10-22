@@ -4,6 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# Chosen with scripts/evaluate_retrieval.py: for all-MiniLM-L6-v2 on the sample
+# notes, 0.8 keeps every answerable question while rejecting far more off-topic
+# questions than 1.0. The best value depends on the embedding model.
+DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD = 0.8
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -20,7 +25,7 @@ class AppConfig:
     chunk_overlap: int
     top_k: int
     chroma_collection_name: str = "study_notes"
-    retrieval_distance_threshold: float | None = 1.0
+    retrieval_distance_threshold: float | None = DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD
     max_uploaded_file_mb: int = 50
     demo_mode: bool = False
     demo_max_questions: int = 20
@@ -142,7 +147,7 @@ def get_config() -> AppConfig:
     top_k = _get_int_env("TOP_K", 5)
     retrieval_distance_threshold = _get_optional_float_env(
         "RETRIEVAL_DISTANCE_THRESHOLD",
-        1.0,
+        DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD,
     )
     max_uploaded_file_mb = _get_int_env("MAX_UPLOADED_FILE_MB", 50)
     demo_mode = _get_bool_env("DEMO_MODE", False)
