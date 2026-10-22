@@ -1,0 +1,96 @@
+name: Record demo
+
+# Records docs/demo.gif and the README screenshots with a real chat model by
+# running scripts/record_demo.py against the app. Runs from the Actions tab, or
+# when a pull request gets the "record-demo" label, in which case the new
+# recording is committed to the pull request. Needs an OPENAI_API_KEY secret.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  record:
+    name: Record demo
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'record-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai/' }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gemini-3.5-flash-lite' }}
+      FASTEMBED_CACHE_PATH: /home/runner/.cache/fastembed
+    steps:
+      - name: Check for an API key
+        if: env.OPENAI_API_KEY == ''
+        run: |
+          echo "::error::Add an OPENAI_API_KEY repository secret to record the demo."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          # The last step pushes the recording to the pull request branch.
+          persist-credentials: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Cache embedding models
+        uses: actions/cache@v6
+        with:
+          path: /home/runner/.cache/fastembed
+          key: fastembed-demo-${{ hashFiles('src/config.py') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
+      - name: Start the app
+        run: |
+          python -c "from src.embeddings import load_embedding_model; load_embedding_model('all-MiniLM-L6-v2')"
+          nohup streamlit run app.py --server.headless true --server.port 8501 \
+            --client.toolbarMode minimal > streamlit.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8501/_stcore/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat streamlit.log
+          exit 1
+
+      - name: Record
+        run: python scripts/record_demo.py --url http://localhost:8501 --output-dir docs
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: demo
+          path: |
+            docs/demo.gif
+            docs/demo-*.png
+            streamlit.log
+          if-no-files-found: ignore
+
+      - name: Commit the recording to the pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/demo.gif docs/demo-chat.png docs/demo-quiz.png
+          if git diff --cached --quiet; then
+            echo "The recording did not change."
+            exit 0
+          fi
+          git commit --message "Record the demo GIF and screenshots"
+          git push
