@@ -6,11 +6,7 @@ from src.citations import build_source_citations, ensure_answer_has_citation_mar
 from src.embeddings import EmbeddingError, EmbeddingModel, generate_embeddings
 from src.models import RagAnswer, RetrievedChunk
 from src.prompts import ANSWER_NOT_FOUND, build_rag_messages
-from src.vector_store import (
-    InvalidEmbeddingError,
-    VectorStoreError,
-    retrieve_similar_chunks,
-)
+from src.vector_store import InvalidEmbeddingError, VectorStoreError, retrieve_similar_chunks
 
 
 class ChatModel(Protocol):
@@ -26,8 +22,7 @@ class ChatModel(Protocol):
         messages: list[dict[str, str]],
         model: str,
         temperature: float = 0.0,
-    ) -> str:
-        ...
+    ) -> str: ...
 
 
 class RagPipelineError(Exception):

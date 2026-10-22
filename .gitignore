@@ -30,8 +30,3 @@ Thumbs.db
 .coverage
 htmlcov/
 coverage.xml
-
-# Coverage reports
-.coverage
-htmlcov/
-coverage.xml

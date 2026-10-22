@@ -1,6 +1,6 @@
 import io
 
-import fitz
+import pymupdf
 
 from src.models import EmbeddedChunk, TextChunk
 
@@ -26,7 +26,7 @@ def create_pdf_with_pages(page_texts: list[str]) -> bytes:
         PDF bytes.
     """
 
-    document = fitz.open()
+    document = pymupdf.open()
 
     for text in page_texts:
         page = document.new_page()

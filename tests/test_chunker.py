@@ -114,3 +114,34 @@ def test_chunk_pages_preserves_metadata() -> None:
         assert chunk.page_number == 3
         assert chunk.chunk_id.startswith("lecture_1_p3_c")
         assert "recursion" in chunk.text
+
+
+def test_chunk_ids_are_unique_across_pages_and_files() -> None:
+    pages = [
+        PageText(
+            file_name="lecture.pdf",
+            page_number=1,
+            text="Same text about algorithms.",
+        ),
+        PageText(
+            file_name="lecture.pdf",
+            page_number=2,
+            text="Same text about algorithms.",
+        ),
+        PageText(
+            file_name="other_lecture.pdf",
+            page_number=1,
+            text="Same text about algorithms.",
+        ),
+    ]
+
+    chunks = chunk_pages(
+        pages=pages,
+        chunk_size=1000,
+        chunk_overlap=150,
+    )
+
+    chunk_ids = [chunk.chunk_id for chunk in chunks]
+
+    assert len(chunks) == 3
+    assert len(set(chunk_ids)) == 3

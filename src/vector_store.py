@@ -9,7 +9,6 @@ from chromadb.config import Settings
 
 from src.models import EmbeddedChunk, RetrievedChunk
 
-
 DEFAULT_COLLECTION_NAME = "study_notes"
 
 
@@ -63,9 +62,7 @@ def validate_collection_name(collection_name: str) -> None:
         )
 
     if re.match(r"^\d+\.\d+\.\d+\.\d+$", collection_name):
-        raise InvalidCollectionNameError(
-            "ChromaDB collection name cannot be an IPv4 address."
-        )
+        raise InvalidCollectionNameError("ChromaDB collection name cannot be an IPv4 address.")
 
 
 def get_chroma_client(chroma_db_dir: str | Path) -> chromadb.PersistentClient:
@@ -88,9 +85,7 @@ def get_chroma_client(chroma_db_dir: str | Path) -> chromadb.PersistentClient:
             settings=Settings(anonymized_telemetry=False),
         )
     except Exception as exc:
-        raise VectorStoreError(
-            f"Could not initialise ChromaDB at '{db_path}'."
-        ) from exc
+        raise VectorStoreError(f"Could not initialise ChromaDB at '{db_path}'.") from exc
 
 
 def get_or_create_collection(
@@ -101,7 +96,7 @@ def get_or_create_collection(
     Get or create a ChromaDB collection.
 
     We use cosine distance because our embeddings represent semantic direction.
-    Sentence Transformers embeddings are also normalised in Phase 4.
+    Question and chunk embeddings are also normalised before storage.
     """
 
     validate_collection_name(collection_name)
@@ -138,9 +133,7 @@ def reset_collection(
         if "does not exist" in message or "not found" in message:
             return
 
-        raise VectorStoreError(
-            f"Could not reset ChromaDB collection '{collection_name}'."
-        ) from exc
+        raise VectorStoreError(f"Could not reset ChromaDB collection '{collection_name}'.") from exc
 
 
 def _validate_embedding_vector(vector: Sequence[float], chunk_id: str) -> list[float]:
@@ -149,9 +142,7 @@ def _validate_embedding_vector(vector: Sequence[float], chunk_id: str) -> list[f
     """
 
     if not isinstance(vector, Sequence) or isinstance(vector, str | bytes):
-        raise InvalidEmbeddingError(
-            f"Embedding for chunk '{chunk_id}' is not a valid sequence."
-        )
+        raise InvalidEmbeddingError(f"Embedding for chunk '{chunk_id}' is not a valid sequence.")
 
     if not vector:
         raise InvalidEmbeddingError(f"Embedding for chunk '{chunk_id}' is empty.")
@@ -202,9 +193,7 @@ def _validate_embedded_chunks(embedded_chunks: list[EmbeddedChunk]) -> list[list
             raise InvalidEmbeddingError("Chunk ID cannot be empty.")
 
         if not chunk.text.strip():
-            raise InvalidEmbeddingError(
-                f"Chunk '{chunk.chunk_id}' has empty text."
-            )
+            raise InvalidEmbeddingError(f"Chunk '{chunk.chunk_id}' has empty text.")
 
         validated_embeddings.append(embedding)
 
@@ -349,6 +338,7 @@ def get_collection_preview(
 
     return preview
 
+
 def filter_chunks_by_max_distance(
     chunks: list[RetrievedChunk],
     max_distance: float | None,
@@ -374,10 +364,9 @@ def filter_chunks_by_max_distance(
         raise VectorStoreError("max_distance cannot be negative.")
 
     return [
-        chunk
-        for chunk in chunks
-        if chunk.distance is not None and chunk.distance <= max_distance
+        chunk for chunk in chunks if chunk.distance is not None and chunk.distance <= max_distance
     ]
+
 
 def retrieve_similar_chunks(
     collection: Any,

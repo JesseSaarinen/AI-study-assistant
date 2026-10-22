@@ -20,8 +20,7 @@ class EmbeddingModel(Protocol):
         batch_size: int = 32,
         show_progress_bar: bool = False,
         normalize_embeddings: bool = True,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 class EmbeddingError(Exception):
@@ -82,9 +81,7 @@ def _vector_to_float_list(vector: Any) -> list[float]:
         vector = vector.tolist()
 
     if not isinstance(vector, Sequence) or isinstance(vector, str | bytes):
-        raise EmbeddingGenerationError(
-            "Embedding model returned an invalid vector format."
-        )
+        raise EmbeddingGenerationError("Embedding model returned an invalid vector format.")
 
     try:
         float_vector = [float(value) for value in vector]
@@ -110,12 +107,8 @@ def _embedding_output_to_lists(raw_embeddings: Any) -> list[list[float]]:
     if hasattr(raw_embeddings, "tolist"):
         raw_embeddings = raw_embeddings.tolist()
 
-    if not isinstance(raw_embeddings, Sequence) or isinstance(
-        raw_embeddings, str | bytes
-    ):
-        raise EmbeddingGenerationError(
-            "Embedding model returned an invalid embeddings format."
-        )
+    if not isinstance(raw_embeddings, Sequence) or isinstance(raw_embeddings, str | bytes):
+        raise EmbeddingGenerationError("Embedding model returned an invalid embeddings format.")
 
     return [_vector_to_float_list(vector) for vector in raw_embeddings]
 

@@ -1,6 +1,5 @@
 import pytest
 
-from src.models import EmbeddedChunk, TextChunk
 from src.prompts import ANSWER_NOT_FOUND
 from src.rag_pipeline import (
     EmptyQuestionError,
@@ -8,11 +7,8 @@ from src.rag_pipeline import (
     answer_question,
     normalise_answer,
 )
-from src.vector_store import (
-    get_chroma_client,
-    get_or_create_collection,
-    upsert_embedded_chunks,
-)
+from src.vector_store import get_chroma_client, get_or_create_collection, upsert_embedded_chunks
+from tests.helpers import make_embedded_chunk
 
 
 class FakeEmbeddingModel:
@@ -62,28 +58,6 @@ class FakeChatModel:
         self.was_called = True
         self.last_messages = messages
         return self.answer
-
-
-def make_embedded_chunk(
-    chunk_id: str,
-    text: str,
-    embedding: list[float],
-    file_name: str = "lecture.pdf",
-    page_number: int = 1,
-) -> EmbeddedChunk:
-    """
-    Create a test embedded chunk.
-    """
-
-    return EmbeddedChunk(
-        chunk=TextChunk(
-            chunk_id=chunk_id,
-            file_name=file_name,
-            page_number=page_number,
-            text=text,
-        ),
-        embedding=embedding,
-    )
 
 
 def test_normalise_answer_strips_whitespace() -> None:
@@ -153,9 +127,7 @@ def test_answer_question_retrieves_context_and_calls_chat_model(tmp_path) -> Non
 
     upsert_embedded_chunks(collection, chunks)
 
-    chat_model = FakeChatModel(
-        "Recursion is when a function calls itself. [Source 1]"
-    )
+    chat_model = FakeChatModel("Recursion is when a function calls itself. [Source 1]")
 
     answer = answer_question(
         question="What is recursion?",
@@ -208,3 +180,35 @@ def test_answer_question_returns_fallback_when_chat_model_says_not_found(
 
     assert answer.answer == ANSWER_NOT_FOUND
     assert answer.sources == []
+
+
+def test_answer_question_returns_fallback_when_retrieval_distance_too_high(
+    tmp_path,
+) -> None:
+    client = get_chroma_client(tmp_path)
+    collection = get_or_create_collection(client, "rag_robust_notes")
+
+    chunk = make_embedded_chunk(
+        chunk_id="recursion_chunk",
+        text="Recursion is when a function calls itself.",
+        embedding=[1.0, 0.0],
+    )
+
+    upsert_embedded_chunks(collection, [chunk])
+
+    chat_model = FakeChatModel("This should not be used.")
+
+    answer = answer_question(
+        question="What is SQL?",
+        collection=collection,
+        embedding_model=FakeEmbeddingModel(),
+        chat_model=chat_model,
+        chat_model_name="fake-model",
+        top_k=1,
+        max_retrieval_distance=0.5,
+    )
+
+    assert answer.answer == ANSWER_NOT_FOUND
+    assert answer.sources == []
+    assert answer.citations == []
+    assert chat_model.was_called is False

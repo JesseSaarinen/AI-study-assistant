@@ -1,7 +1,9 @@
+import contextlib
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Protocol
+from typing import Protocol
 
-import fitz
+import pymupdf
 
 from src.models import PageText
 
@@ -16,11 +18,9 @@ class UploadedPDFLike(Protocol):
 
     name: str
 
-    def read(self) -> bytes:
-        ...
+    def read(self) -> bytes: ...
 
-    def seek(self, offset: int, whence: int = 0) -> int:
-        ...
+    def seek(self, offset: int, whence: int = 0) -> int: ...
 
 
 class PDFExtractionError(Exception):
@@ -81,9 +81,7 @@ def _validate_pdf_file_name(file_name: str) -> None:
     """
 
     if not file_name.lower().endswith(".pdf"):
-        raise InvalidPDFTypeError(
-            f"{file_name}: invalid file type. Please upload a PDF file."
-        )
+        raise InvalidPDFTypeError(f"{file_name}: invalid file type. Please upload a PDF file.")
 
 
 def _read_uploaded_file(uploaded_file: UploadedPDFLike, file_name: str) -> bytes:
@@ -93,20 +91,16 @@ def _read_uploaded_file(uploaded_file: UploadedPDFLike, file_name: str) -> bytes
     We try to reset the pointer first so repeated reads work reliably.
     """
 
-    try:
+    with contextlib.suppress(Exception):
         uploaded_file.seek(0)
-    except Exception:
-        pass
 
     try:
         data = uploaded_file.read()
     except Exception as exc:
         raise PDFExtractionError(f"{file_name}: failed to read uploaded file.") from exc
 
-    try:
+    with contextlib.suppress(Exception):
         uploaded_file.seek(0)
-    except Exception:
-        pass
 
     return data
 
@@ -142,9 +136,7 @@ def _validate_pdf_bytes(
     # We check the first 1024 bytes rather than only the first bytes because
     # some PDFs may include a small preamble.
     if b"%PDF" not in pdf_bytes[:1024]:
-        raise InvalidPDFTypeError(
-            f"{file_name}: this file does not appear to be a valid PDF."
-        )
+        raise InvalidPDFTypeError(f"{file_name}: this file does not appear to be a valid PDF.")
 
 
 def clean_extracted_text(text: str) -> str:
@@ -200,7 +192,7 @@ def extract_text_from_pdf(
     document = None
 
     try:
-        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     except Exception as exc:
         raise InvalidPDFError(
             f"{file_name}: could not be opened as a PDF. "

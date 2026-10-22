@@ -24,10 +24,7 @@ class FakeEmbeddingModel:
         show_progress_bar: bool = False,
         normalize_embeddings: bool = True,
     ) -> list[list[float]]:
-        return [
-            [float(len(sentence)), float(index)]
-            for index, sentence in enumerate(sentences)
-        ]
+        return [[float(len(sentence)), float(index)] for index, sentence in enumerate(sentences)]
 
 
 class BadCountEmbeddingModel:
@@ -122,3 +119,53 @@ def test_generate_embeddings_detects_wrong_number_of_embeddings() -> None:
 
     with pytest.raises(EmbeddingGenerationError):
         generate_embeddings(texts=["text one", "text two"], model=model)
+
+
+class InvalidVectorOutputModel:
+    """
+    Fake model that returns invalid vector output.
+    """
+
+    def encode(
+        self,
+        sentences: list[str],
+        batch_size: int = 32,
+        show_progress_bar: bool = False,
+        normalize_embeddings: bool = True,
+    ) -> list[str]:
+        return ["not-a-vector" for _ in sentences]
+
+
+class NonNumericVectorOutputModel:
+    """
+    Fake model that returns a vector containing a non-numeric value.
+    """
+
+    def encode(
+        self,
+        sentences: list[str],
+        batch_size: int = 32,
+        show_progress_bar: bool = False,
+        normalize_embeddings: bool = True,
+    ) -> list[list[object]]:
+        return [[1.0, "not-a-number"] for _ in sentences]
+
+
+def test_generate_embeddings_rejects_invalid_vector_output() -> None:
+    model = InvalidVectorOutputModel()
+
+    with pytest.raises(EmbeddingGenerationError):
+        generate_embeddings(
+            texts=["Some valid text."],
+            model=model,
+        )
+
+
+def test_generate_embeddings_rejects_non_numeric_vector_values() -> None:
+    model = NonNumericVectorOutputModel()
+
+    with pytest.raises(EmbeddingGenerationError):
+        generate_embeddings(
+            texts=["Some valid text."],
+            model=model,
+        )

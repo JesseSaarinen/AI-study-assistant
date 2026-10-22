@@ -36,9 +36,7 @@ def validate_chunking_params(chunk_size: int, chunk_overlap: int) -> None:
         raise InvalidChunkingConfigError("CHUNK_OVERLAP cannot be negative.")
 
     if chunk_overlap >= chunk_size:
-        raise InvalidChunkingConfigError(
-            "CHUNK_OVERLAP must be smaller than CHUNK_SIZE."
-        )
+        raise InvalidChunkingConfigError("CHUNK_OVERLAP must be smaller than CHUNK_SIZE.")
 
 
 def normalise_text_for_chunking(text: str) -> str:

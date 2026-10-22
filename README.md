@@ -1,5 +1,7 @@
 # AI Study Assistant for University Notes
 
+[![CI](https://github.com/JesseSaarinen/AI-study-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/JesseSaarinen/AI-study-assistant/actions/workflows/ci.yml)
+
 A retrieval-augmented generation (RAG) web application that lets students upload university lecture notes as PDFs and ask questions grounded in the uploaded material.
 
 The app extracts text from PDFs, chunks the text, generates local embeddings with Sentence Transformers, stores them in ChromaDB, retrieves relevant chunks for each question, and uses an OpenAI-compatible chat model to generate answers with source citations.
@@ -100,47 +102,37 @@ This helps the model produce answers that are more grounded, traceable, and rele
 
 ```text
 AI-study-assistant/
-├── app.py
-├── requirements.txt
+├── app.py                  # Streamlit entry point
+├── pyproject.toml          # pytest, coverage and ruff configuration
+├── requirements.txt        # runtime dependencies
+├── requirements-dev.txt    # test and lint dependencies
 ├── .env.example
-├── .gitignore
-├── pytest.ini
-├── README.md
-├── docs/
-│   ├── AI-assistant-answer-example.png
-│   └── AI-assistant-uploadfile-example.png
-├── storage/
-│   └── .gitkeep
-├── src/
-│   ├── __init__.py
-│   ├── chunker.py
-│   ├── citations.py
-│   ├── config.py
-│   ├── embeddings.py
-│   ├── models.py
-│   ├── pdf_loader.py
-│   ├── prompts.py
-│   ├── rag_pipeline.py
-│   ├── ui_helpers.py
-│   └── vector_store.py
-└── tests/
-    ├── helpers.py
-    ├── test_chunker.py
-    ├── test_citations.py
-    ├── test_config.py
-    ├── test_config_phase9.py
-    ├── test_embeddings.py
-    ├── test_end_to_end_pipeline.py
-    ├── test_pdf_loader.py
-    ├── test_pdf_loader_robustness.py
-    ├── test_phase10_edge_cases.py
-    ├── test_prompts.py
-    ├── test_rag_pipeline.py
-    ├── test_rag_pipeline_robustness.py
-    ├── test_ui_helpers.py
-    ├── test_vector_store.py
-    └── test_vector_store_robustness.py
+├── .github/workflows/ci.yml
+├── docs/                   # screenshots
+├── storage/                # local ChromaDB data (git-ignored)
+├── src/                    # RAG logic, no Streamlit imports
+│   ├── chunker.py          # overlapping, page-aware text chunks
+│   ├── citations.py        # [Source N] parsing and formatting
+│   ├── config.py           # environment-based settings with validation
+│   ├── embeddings.py       # Sentence Transformers wrapper
+│   ├── ingestion.py        # extract → chunk → embed → store pipeline
+│   ├── models.py           # dataclasses shared across modules
+│   ├── pdf_loader.py       # PyMuPDF text extraction and validation
+│   ├── prompts.py          # grounded system and user prompts
+│   ├── rag_pipeline.py     # retrieval and answer generation
+│   ├── ui_helpers.py       # pure formatting helpers for the UI
+│   └── vector_store.py     # ChromaDB storage and retrieval
+├── ui/                     # Streamlit components, one module per tab
+│   ├── ask_tab.py
+│   ├── inspect_tab.py
+│   ├── process_tab.py
+│   ├── resources.py        # cached models and clients
+│   ├── sidebar.py
+│   └── state.py            # session state helpers
+└── tests/                  # one test module per src module, plus end-to-end tests
 ```
+
+The `src/` package has no Streamlit dependency, so the same pipeline is used by the app and the tests.
 
 ## Setup
 
@@ -183,8 +175,10 @@ source .venv/bin/activate
 
 ```bash
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+
+`requirements-dev.txt` installs the app dependencies plus pytest and ruff. Use `requirements.txt` if you only want to run the app.
 
 The first install can take several minutes because `sentence-transformers` depends on PyTorch.
 
@@ -343,8 +337,17 @@ pytest
 Run tests with coverage:
 
 ```bash
-pytest --cov=src --cov-report=term-missing
+pytest --cov --cov-report=term-missing
 ```
+
+Lint and format check:
+
+```bash
+ruff check .
+ruff format --check .
+```
+
+GitHub Actions runs the linter and the full test suite on every push and pull request.
 
 The tests run without external API calls and cover:
 
@@ -430,7 +433,7 @@ The app handles common issues such as:
 
 ## Limitations
 
-This is an MVP and has some limitations:
+Known limitations:
 
 - It only works well with PDFs containing selectable text.
 - Scanned PDFs require OCR, which is not included.
