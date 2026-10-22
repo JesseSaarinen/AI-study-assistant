@@ -18,10 +18,10 @@ It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB,
 - **Grounded answers with page citations.** Answers cite `[Source N]` markers, and the UI shows the file, page and retrieved text behind each one.
 - **A conversation, not a search box.** Follow-up questions such as "why is that?" are rewritten into standalone questions before retrieval, and answers stream in as they are generated.
 - **Says "I could not find this in the uploaded notes."** when retrieval finds nothing relevant, without calling the chat model at all.
-- **Measured, not guessed.** A labelled question set and an evaluation script compare embedding models, chunk sizes and distance thresholds, and the results set the app's defaults. [Results below](#retrieval-evaluation).
+- **Measured, not guessed.** A labelled question set and an evaluation script compare embedding models, chunk sizes and distance thresholds, and the results set the app's defaults. A second script grades the answers themselves: refusals, citations, and an LLM judge for faithfulness. [Retrieval results](#retrieval-evaluation) and [answer evaluation](#answer-evaluation) below.
 - **Light enough for free hosting.** Embeddings run on ONNX Runtime through FastEmbed, so the install is about 1 GB instead of 6.6 GB with PyTorch.
 - **Ready for a public demo.** Bundled sample notes, one-click example questions, and a demo mode that isolates each visitor's notes and caps API usage.
-- **Tested.** 150 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
+- **Tested.** 169 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
 
 ## How it works
 
@@ -119,6 +119,20 @@ Findings:
 - **Thresholds do not transfer between models.** `bge-small-en-v1.5` places every chunk within 0.5 of the question, so a threshold of 0.8 filters nothing for it.
 - **The multilingual model is weaker on English notes and prefers small chunks.** If you use it for Finnish notes, try a `CHUNK_SIZE` of 300 to 500.
 
+## Answer evaluation
+
+Good retrieval does not guarantee a good answer, so [`scripts/evaluate_answers.py`](scripts/evaluate_answers.py) runs the same 38 questions through the full pipeline with a real chat model and grades every answer:
+
+| Metric | How it is measured |
+|---|---|
+| Answer rate | Answerable questions that get an answer instead of the not-found reply. Checked against the labels. |
+| Correct refusals | Unanswerable questions that get the not-found reply, split into those filtered by distance before the chat model and those the model refused itself. |
+| Citation accuracy | Whether the cited `[Source N]` chunks come from the labelled pages. |
+| Faithfulness | An LLM judge checks every claim in the answer against the retrieved context, so a correct claim that is not in the notes still counts as unsupported. |
+| Relevance | The same judge checks that the answer addresses the question. |
+
+Refusals are graded by the labels alone, and the judge only sees answers. The script spaces out requests to stay within free tier limits; a full run with a free Gemini key takes about ten minutes. It runs in GitHub Actions on demand, from the Actions tab or by adding the `evaluate-answers` label to a pull request, using an `OPENAI_API_KEY` repository secret. The report lists every answer that needs a look and is written to `eval/answer_results.md`.
+
 ## Design decisions
 
 - **Chunks never cross page boundaries.** It costs a little context at page edges, but every chunk maps to one page, so a citation always points to a page the student can open.
@@ -136,25 +150,26 @@ Findings:
 AI-study-assistant/
 ├── app.py                  # Streamlit entry point
 ├── src/                    # RAG pipeline, no Streamlit imports
-│   ├── pdf_loader.py       # PyMuPDF text extraction and validation
-│   ├── chunker.py          # overlapping, page-aware text chunks
-│   ├── embeddings.py       # FastEmbed (ONNX) embedding model wrapper
-│   ├── vector_store.py     # ChromaDB storage and retrieval
-│   ├── ingestion.py        # extract → chunk → embed → store
-│   ├── prompts.py          # grounded answer and follow-up rewrite prompts
-│   ├── rag_pipeline.py     # rewrite, retrieval and streamed answers
-│   ├── citations.py        # [Source N] parsing and formatting
-│   ├── evaluation.py       # hit rate, MRR and threshold metrics
-│   ├── config.py           # environment-based settings with validation
-│   ├── models.py           # dataclasses shared across modules
-│   └── ui_helpers.py       # pure formatting helpers for the UI
+│   ├── pdf_loader.py        # PyMuPDF text extraction and validation
+│   ├── chunker.py           # overlapping, page-aware text chunks
+│   ├── embeddings.py        # FastEmbed (ONNX) embedding model wrapper
+│   ├── vector_store.py      # ChromaDB storage and retrieval
+│   ├── ingestion.py         # extract → chunk → embed → store
+│   ├── prompts.py           # grounded answer and follow-up rewrite prompts
+│   ├── rag_pipeline.py      # rewrite, retrieval and streamed answers
+│   ├── citations.py         # [Source N] parsing and formatting
+│   ├── evaluation.py        # hit rate, MRR and threshold metrics
+│   ├── answer_evaluation.py # refusal, citation and LLM judge metrics
+│   ├── config.py            # environment-based settings with validation
+│   ├── models.py            # dataclasses shared across modules
+│   └── ui_helpers.py        # pure formatting helpers for the UI
 ├── ui/                     # Streamlit components, one module per tab
 ├── tests/                  # one test module per source module, plus app tests
 ├── eval/                   # labelled questions and the latest results
 ├── scripts/                # sample notes builder and evaluation script
 ├── sample_data/            # bundled sample lecture notes (PDF)
 ├── docs/                   # deployment guide and screenshots
-├── .github/workflows/      # CI and retrieval evaluation
+├── .github/workflows/      # CI, retrieval evaluation and answer evaluation
 ├── requirements.txt        # runtime dependencies
 ├── requirements-dev.txt    # adds pytest and ruff
 └── pyproject.toml          # pytest, coverage and ruff settings
@@ -186,10 +201,11 @@ For notes in Finnish or other languages, set `EMBEDDING_MODEL_NAME=paraphrase-mu
 ## Testing
 
 ```bash
-pytest                                  # 150 tests, no network access needed
+pytest                                  # 169 tests, no network access needed
 pytest --cov --cov-report=term-missing  # with coverage
 ruff check . && ruff format --check .   # lint and format
 python scripts/evaluate_retrieval.py    # retrieval evaluation, downloads the models
+python scripts/evaluate_answers.py      # answer evaluation, needs a chat API key
 ```
 
 The tests use small in-memory PDFs, a temporary ChromaDB and fake embedding and chat models. They cover PDF validation, chunking, embeddings, storage and retrieval, prompts, citations, configuration, the evaluation metrics, the full pipeline, and the Streamlit app through `AppTest`.
@@ -203,7 +219,8 @@ The app deploys for free on Streamlit Community Cloud with a free Gemini or Groq
 - **Scanned PDFs** have no selectable text and need OCR, which is not included yet.
 - **Slides and tables.** Slide decks produce short chunks, repeated headers and footers add noise, and tables, formulas and images are not interpreted.
 - **Retrieval is vector only.** Hybrid keyword and vector search, or a reranker, would help with exact terms such as course codes.
-- **The evaluation is small.** Thirty questions on one document, written by the same author as the notes, so the numbers are optimistic. Answer quality, as opposed to retrieval, is not measured yet.
+- **The evaluation is small.** Thirty questions on one document, written by the same author as the notes, so the numbers are optimistic.
+- **The judge is a language model.** By default it is the same model that wrote the answers, which tends to grade its own output generously. `--judge-model` lets a different model grade, and the report lists every flagged answer so the verdicts can be checked by hand.
 - **Privacy.** Retrieved note text is sent to the configured chat provider. Use Ollama to keep everything on your machine.
 - **Single user locally.** There are no accounts, and outside demo mode all notes share one collection.
 
