@@ -40,7 +40,7 @@ jobs:
           echo "::error::Add an OPENAI_API_KEY repository secret to run the answer evaluation."
           exit 1
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -49,7 +49,7 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Cache embedding models
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/fastembed
           key: fastembed-answers-${{ hashFiles('src/config.py') }}
@@ -71,7 +71,7 @@ jobs:
           python scripts/evaluate_answers.py "${args[@]}"
           cat eval/answer_results.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: answer-evaluation

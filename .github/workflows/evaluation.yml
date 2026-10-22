@@ -18,7 +18,7 @@ jobs:
     env:
       FASTEMBED_CACHE_PATH: /home/runner/.cache/fastembed
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Cache embedding models
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /home/runner/.cache/fastembed
           key: fastembed-${{ hashFiles('scripts/evaluate_retrieval.py') }}
@@ -42,7 +42,7 @@ jobs:
           python scripts/evaluate_retrieval.py --output eval/results.md --fail-under 0.9
           cat eval/results.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: retrieval-evaluation
           path: eval/results.md
