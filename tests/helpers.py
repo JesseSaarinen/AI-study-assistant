@@ -5,6 +5,7 @@ import pymupdf
 
 from src.models import EmbeddedChunk, TextChunk
 from src.prompts import REWRITE_SYSTEM_PROMPT
+from src.quiz import QUIZ_SYSTEM_PROMPT
 
 
 class FakeUploadedFile(io.BytesIO):
@@ -85,12 +86,19 @@ class FixedAnswerChatModel:
     Fake chat model that returns a fixed answer and records every call.
 
     Requests to rewrite a follow-up question get the rewrite text instead, so
-    tests can check which question was used for retrieval.
+    tests can check which question was used for retrieval, and quiz requests
+    get the quiz reply.
     """
 
-    def __init__(self, answer: str, rewrite: str = "Rewritten standalone question?") -> None:
+    def __init__(
+        self,
+        answer: str,
+        rewrite: str = "Rewritten standalone question?",
+        quiz: str = "[]",
+    ) -> None:
         self.answer = answer
         self.rewrite = rewrite
+        self.quiz = quiz
         self.was_called = False
         self.last_messages: list[dict[str, str]] = []
         self.calls: list[list[dict[str, str]]] = []
@@ -102,6 +110,9 @@ class FixedAnswerChatModel:
 
         if messages[0]["content"] == REWRITE_SYSTEM_PROMPT:
             return self.rewrite
+
+        if messages[0]["content"] == QUIZ_SYSTEM_PROMPT:
+            return self.quiz
 
         return self.answer
 

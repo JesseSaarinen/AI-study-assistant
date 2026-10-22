@@ -17,11 +17,12 @@ It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB,
 
 - **Grounded answers with page citations.** Answers cite `[Source N]` markers, and the UI shows the file, page and retrieved text behind each one.
 - **A conversation, not a search box.** Follow-up questions such as "why is that?" are rewritten into standalone questions before retrieval, and answers stream in as they are generated.
+- **Practice quizzes from your own notes.** Multiple-choice questions with explanations and page references, checked in the app and exportable as Anki flashcards.
 - **Says "I could not find this in the uploaded notes."** when retrieval finds nothing relevant, without calling the chat model at all.
 - **Measured, not guessed.** A labelled question set and an evaluation script compare embedding models, chunk sizes and distance thresholds, and the results set the app's defaults. A second script grades the answers themselves: refusals, citations, and an LLM judge for faithfulness. [Retrieval results](#retrieval-evaluation) and [answer evaluation](#answer-evaluation) below.
 - **Light enough for free hosting.** Embeddings run on ONNX Runtime through FastEmbed, so the install is about 1 GB instead of 6.6 GB with PyTorch.
 - **Ready for a public demo.** Bundled sample notes, one-click example questions, and a demo mode that isolates each visitor's notes and caps API usage.
-- **Tested.** 169 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
+- **Tested.** 183 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
 
 ## How it works
 
@@ -92,11 +93,12 @@ For Ollama, set `OPENAI_API_KEY` to any non-empty value such as `ollama`. Model 
 
 ## Using the app
 
-The app has three tabs that follow the pipeline:
+The app has four tabs that follow the pipeline:
 
 1. **Process notes.** Upload PDFs and process them end to end, or load the bundled sample notes. An advanced panel runs each stage on its own, which is handy for debugging or for showing how RAG works.
 2. **Inspect data.** Browse the extracted pages, chunks, embedding vectors and the records stored in ChromaDB.
 3. **Ask questions.** Chat about the stored notes and ask follow-up questions. Under each answer, a sources panel lists the citations and the retrieved chunks with their distance scores, with the cited ones marked.
+4. **Practice.** Generate a multiple-choice quiz on a topic or across all of the notes. Checking the answers shows the score, an explanation and the source page for each question, and the questions download as a CSV that Anki and most flashcard apps import.
 
 ![Upload and processing](docs/AI-assistant-uploadfile-example.png)
 
@@ -145,6 +147,7 @@ Refusals are graded by the labels alone, and the judge only sees answers. The sc
 - **Chunks never cross page boundaries.** It costs a little context at page edges, but every chunk maps to one page, so a citation always points to a page the student can open.
 - **Cosine distance on normalised vectors.** Distances stay between 0 and 2 regardless of text length, which makes a single threshold meaningful across documents.
 - **History rewrites the question, it does not answer it.** Earlier turns are used only to turn a follow-up into a standalone question. The answer prompt holds that question and freshly retrieved chunks, so every `[Source N]` the model sees belongs to the current answer, and a long conversation does not grow the prompt. If the rewrite fails, the original question is used.
+- **Quizzes are checked in code, not trusted.** The model returns JSON, and every question is validated: exactly one option must match the stated answer, options must be distinct, and the cited passage must exist. Broken items are dropped instead of failing the quiz. The options are shuffled in code, because models tend to put the right answer in the same position. Without a topic, passages are drawn from as many different pages as possible so a quiz covers the whole set of notes.
 - **Filter before the model, not after.** If no chunk is close enough, the app returns the not-found message without an API call. That is cheaper, and it removes the main source of hallucinated answers: weakly related context.
 - **FastEmbed instead of Sentence Transformers.** The same model runs on ONNX Runtime, which removes PyTorch and its CUDA libraries from the install. Swapping models is one setting, and the evaluation script shows what each choice costs.
 - **Any OpenAI-compatible API.** Free tiers and local models work with no code changes, which matters for students without a paid API account.
@@ -165,6 +168,7 @@ AI-study-assistant/
 │   ├── prompts.py           # grounded answer and follow-up rewrite prompts
 │   ├── rag_pipeline.py      # rewrite, retrieval and streamed answers
 │   ├── citations.py         # [Source N] parsing and formatting
+│   ├── quiz.py              # quiz generation, validation and flashcard export
 │   ├── evaluation.py        # hit rate, MRR and threshold metrics
 │   ├── answer_evaluation.py # refusal, citation and LLM judge metrics
 │   ├── config.py            # environment-based settings with validation
@@ -208,7 +212,7 @@ For notes in Finnish or other languages, set `EMBEDDING_MODEL_NAME=paraphrase-mu
 ## Testing
 
 ```bash
-pytest                                  # 169 tests, no network access needed
+pytest                                  # 183 tests, no network access needed
 pytest --cov --cov-report=term-missing  # with coverage
 ruff check . && ruff format --check .   # lint and format
 python scripts/evaluate_retrieval.py    # retrieval evaluation, downloads the models
@@ -231,7 +235,7 @@ The app deploys for free on Streamlit Community Cloud with a free Gemini or Groq
 - **Privacy.** Retrieved note text is sent to the configured chat provider. Use Ollama to keep everything on your machine.
 - **Single user locally.** There are no accounts, and outside demo mode all notes share one collection.
 
-Ideas for next steps: OCR for scanned notes, separate collections per course, deleting single documents, and generated flashcards or quizzes.
+Ideas for next steps: OCR for scanned notes, separate collections per course, deleting single documents, and spaced repetition for quiz questions answered wrong.
 
 ## License
 
