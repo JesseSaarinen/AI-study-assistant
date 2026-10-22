@@ -121,17 +121,24 @@ Findings:
 
 ## Answer evaluation
 
-Good retrieval does not guarantee a good answer, so [`scripts/evaluate_answers.py`](scripts/evaluate_answers.py) runs the same 38 questions through the full pipeline with a real chat model and grades every answer:
+Good retrieval does not guarantee a good answer, so [`scripts/evaluate_answers.py`](scripts/evaluate_answers.py) runs the same 38 questions through the full pipeline with a real chat model and grades every answer. Results of one run with `gemini-3.5-flash-lite` on the sample notes, with the same model as the judge (full report in [`eval/answer_results.md`](eval/answer_results.md)):
 
-| Metric | How it is measured |
-|---|---|
-| Answer rate | Answerable questions that get an answer instead of the not-found reply. Checked against the labels. |
-| Correct refusals | Unanswerable questions that get the not-found reply, split into those filtered by distance before the chat model and those the model refused itself. |
-| Citation accuracy | Whether the cited `[Source N]` chunks come from the labelled pages. |
-| Faithfulness | An LLM judge checks every claim in the answer against the retrieved context, so a correct claim that is not in the notes still counts as unsupported. |
-| Relevance | The same judge checks that the answer addresses the question. |
+| Metric | Result | How it is measured |
+|---|---:|---|
+| Answer rate | 100% | Answerable questions that get an answer instead of the not-found reply. Checked against the labels. |
+| Correct refusals | 100% | Unanswerable questions that get the not-found reply: 3 of 8 were filtered by distance before the chat model, and the model refused the other 5 itself. |
+| Cites an expected page | 100% | Answers that cite at least one labelled page. |
+| Citation precision | 100% | Cited `[Source N]` chunks that come from a labelled page. |
+| Faithfulness | 1.00 | Mean judge score (1 supported, 0.5 partly, 0 unsupported). The judge checks every claim against the retrieved context, so a correct claim that is not in the notes still counts as unsupported. |
+| Relevance | 1.00 | The same judge checks that the answer addresses the question. |
 
-Refusals are graded by the labels alone, and the judge only sees answers. The script spaces out requests to stay within free tier limits; a full run with a free Gemini key takes about ten minutes. It runs in GitHub Actions on demand, from the Actions tab or by adding the `evaluate-answers` label to a pull request, using an `OPENAI_API_KEY` repository secret. The report lists every answer that needs a look and is written to `eval/answer_results.md`.
+Findings:
+
+- **The two refusal layers split the work.** The distance threshold stops clearly unrelated questions, such as the capital of Finland, without an API call. Near misses such as B-trees, A* search and tries pass the threshold, and the prompt makes the model say the notes do not cover them instead of answering from general knowledge.
+- **No answer went beyond the notes.** Every answer cited a labelled page, and the judge found no claims outside the retrieved context.
+- **Read 100% as "no problems found", not as a benchmark.** The test set is small and clean, and the judge grades its own model's answers (see [limitations](#limitations-and-next-steps)). The evaluation's job is to catch regressions when the prompt, the model or the retrieval settings change.
+
+Refusals are graded by the labels alone, and the judge only sees answers. The script spaces out requests to stay within free tier limits; a full run with a free Gemini key takes about seven minutes. It runs in GitHub Actions on demand, from the Actions tab or by adding the `evaluate-answers` label to a pull request, using an `OPENAI_API_KEY` repository secret. `--pdf` and `--questions` point it at your own notes and labelled questions.
 
 ## Design decisions
 
@@ -166,7 +173,7 @@ AI-study-assistant/
 ├── ui/                     # Streamlit components, one module per tab
 ├── tests/                  # one test module per source module, plus app tests
 ├── eval/                   # labelled questions and the latest results
-├── scripts/                # sample notes builder and evaluation script
+├── scripts/                # sample notes builder and evaluation scripts
 ├── sample_data/            # bundled sample lecture notes (PDF)
 ├── docs/                   # deployment guide and screenshots
 ├── .github/workflows/      # CI, retrieval evaluation and answer evaluation
@@ -219,7 +226,7 @@ The app deploys for free on Streamlit Community Cloud with a free Gemini or Groq
 - **Scanned PDFs** have no selectable text and need OCR, which is not included yet.
 - **Slides and tables.** Slide decks produce short chunks, repeated headers and footers add noise, and tables, formulas and images are not interpreted.
 - **Retrieval is vector only.** Hybrid keyword and vector search, or a reranker, would help with exact terms such as course codes.
-- **The evaluation is small.** Thirty questions on one document, written by the same author as the notes, so the numbers are optimistic.
+- **The evaluation is small.** 38 questions on one short document, written by the same author as the notes, so the numbers are optimistic.
 - **The judge is a language model.** By default it is the same model that wrote the answers, which tends to grade its own output generously. `--judge-model` lets a different model grade, and the report lists every flagged answer so the verdicts can be checked by hand.
 - **Privacy.** Retrieved note text is sent to the configured chat provider. Use Ollama to keep everything on your machine.
 - **Single user locally.** There are no accounts, and outside demo mode all notes share one collection.
