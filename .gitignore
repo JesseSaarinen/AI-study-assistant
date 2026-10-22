@@ -14,7 +14,7 @@ env/
 .env
 
 # Streamlit
-.streamlit/
+.streamlit/secrets.toml
 
 # Local storage
 storage/chroma/

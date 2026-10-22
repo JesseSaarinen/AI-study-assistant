@@ -4,7 +4,7 @@
 
 A retrieval-augmented generation (RAG) web application that lets students upload university lecture notes as PDFs and ask questions grounded in the uploaded material.
 
-The app extracts text from PDFs, chunks the text, generates local embeddings with Sentence Transformers, stores them in ChromaDB, retrieves relevant chunks for each question, and uses an OpenAI-compatible chat model to generate answers with source citations.
+The app extracts text from PDFs, chunks the text, generates local embeddings with a Sentence Transformers model running on ONNX Runtime, stores them in ChromaDB, retrieves relevant chunks for each question, and uses an OpenAI-compatible chat model to generate answers with source citations.
 
 ## Screenshots
 
@@ -33,7 +33,7 @@ I could not find this in the uploaded notes.
 - Upload one or more PDF lecture notes
 - Extract text page by page using PyMuPDF
 - Split text into overlapping chunks
-- Generate local embeddings using Sentence Transformers
+- Generate local embeddings with FastEmbed (ONNX Runtime, no PyTorch)
 - Store embeddings, text, and metadata in ChromaDB
 - Ask natural language questions about uploaded notes
 - Retrieve semantically relevant chunks from the vector database
@@ -55,7 +55,7 @@ I could not find this in the uploaded notes.
 | Language | Python 3.11 |
 | Web UI | Streamlit |
 | PDF extraction | PyMuPDF |
-| Embeddings | Sentence Transformers |
+| Embeddings | FastEmbed (ONNX Runtime) |
 | Embedding model | `all-MiniLM-L6-v2` |
 | Vector database | ChromaDB |
 | LLM API | OpenAI-compatible chat API |
@@ -114,7 +114,7 @@ AI-study-assistant/
 │   ├── chunker.py          # overlapping, page-aware text chunks
 │   ├── citations.py        # [Source N] parsing and formatting
 │   ├── config.py           # environment-based settings with validation
-│   ├── embeddings.py       # Sentence Transformers wrapper
+│   ├── embeddings.py       # FastEmbed (ONNX) embedding model wrapper
 │   ├── ingestion.py        # extract → chunk → embed → store pipeline
 │   ├── models.py           # dataclasses shared across modules
 │   ├── pdf_loader.py       # PyMuPDF text extraction and validation
@@ -180,7 +180,7 @@ pip install -r requirements-dev.txt
 
 `requirements-dev.txt` installs the app dependencies plus pytest and ruff. Use `requirements.txt` if you only want to run the app.
 
-The first install can take several minutes because `sentence-transformers` depends on PyTorch.
+Embeddings run on ONNX Runtime through FastEmbed, so PyTorch is not needed and the install stays around 1 GB.
 
 ### 4. Create your environment file
 
@@ -374,7 +374,7 @@ The app is configured using environment variables.
 | `OPENAI_API_KEY` | API key for the OpenAI-compatible chat model |
 | `OPENAI_BASE_URL` | Base URL for the chat API |
 | `OPENAI_MODEL` | Chat model name |
-| `EMBEDDING_MODEL_NAME` | Sentence Transformers model name |
+| `EMBEDDING_MODEL_NAME` | Sentence Transformers model name, run with FastEmbed |
 | `CHROMA_DB_DIR` | Local ChromaDB storage path |
 | `CHROMA_COLLECTION_NAME` | ChromaDB collection name |
 | `CHUNK_SIZE` | Maximum chunk size in characters |

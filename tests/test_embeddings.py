@@ -1,10 +1,15 @@
+import numpy as np
 import pytest
 
 from src.embeddings import (
     EmbeddingGenerationError,
+    EmbeddingModelLoadError,
+    FastEmbedModel,
     embed_chunks,
     generate_embeddings,
     get_embedding_dimension,
+    load_embedding_model,
+    resolve_model_name,
 )
 from src.models import TextChunk
 
@@ -169,3 +174,61 @@ def test_generate_embeddings_rejects_non_numeric_vector_values() -> None:
             texts=["Some valid text."],
             model=model,
         )
+
+
+class FakeTextEmbedding:
+    """
+    Stand-in for fastembed.TextEmbedding that returns fixed, unnormalised vectors.
+    """
+
+    def __init__(self, model_name: str) -> None:
+        self.model_name = model_name
+
+    def embed(self, documents: list[str], batch_size: int = 256):
+        for _ in documents:
+            yield np.array([3.0, 4.0])
+
+
+@pytest.mark.parametrize(
+    ("model_name", "expected"),
+    [
+        ("all-MiniLM-L6-v2", "sentence-transformers/all-MiniLM-L6-v2"),
+        (" all-MiniLM-L6-v2 ", "sentence-transformers/all-MiniLM-L6-v2"),
+        ("BAAI/bge-small-en-v1.5", "BAAI/bge-small-en-v1.5"),
+    ],
+)
+def test_resolve_model_name_adds_default_namespace(model_name: str, expected: str) -> None:
+    assert resolve_model_name(model_name) == expected
+
+
+def test_fastembed_model_returns_normalised_vectors(monkeypatch) -> None:
+    monkeypatch.setattr("fastembed.TextEmbedding", FakeTextEmbedding)
+
+    model = FastEmbedModel("all-MiniLM-L6-v2")
+    embeddings = generate_embeddings(texts=["first", "second"], model=model)
+
+    assert model.model_name == "sentence-transformers/all-MiniLM-L6-v2"
+    assert embeddings == [[0.6, 0.8], [0.6, 0.8]]
+
+
+def test_fastembed_model_can_skip_normalisation(monkeypatch) -> None:
+    monkeypatch.setattr("fastembed.TextEmbedding", FakeTextEmbedding)
+
+    model = FastEmbedModel("all-MiniLM-L6-v2")
+
+    assert model.encode(["text"], normalize_embeddings=False) == [[3.0, 4.0]]
+
+
+def test_load_embedding_model_rejects_empty_name() -> None:
+    with pytest.raises(EmbeddingModelLoadError):
+        load_embedding_model("   ")
+
+
+def test_load_embedding_model_wraps_loading_errors(monkeypatch) -> None:
+    def failing_text_embedding(model_name: str):
+        raise ValueError(f"Unknown model {model_name}")
+
+    monkeypatch.setattr("fastembed.TextEmbedding", failing_text_embedding)
+
+    with pytest.raises(EmbeddingModelLoadError):
+        load_embedding_model("not-a-real-model")

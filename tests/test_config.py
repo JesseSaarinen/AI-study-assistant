@@ -93,3 +93,41 @@ def test_get_config_rejects_invalid_max_uploaded_file_size(monkeypatch) -> None:
 
     with pytest.raises(ValueError):
         get_config()
+
+
+def test_get_config_demo_mode_is_off_by_default(monkeypatch) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+
+    config = get_config()
+
+    assert config.demo_mode is False
+    assert config.demo_max_questions == 20
+
+
+@pytest.mark.parametrize("raw_value", ["true", "TRUE", "yes", "1", "on"])
+def test_get_config_reads_demo_mode(monkeypatch, raw_value: str) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.setenv("DEMO_MODE", raw_value)
+    monkeypatch.setenv("DEMO_MAX_QUESTIONS", "5")
+
+    config = get_config()
+
+    assert config.demo_mode is True
+    assert config.demo_max_questions == 5
+
+
+def test_get_config_rejects_invalid_demo_mode(monkeypatch) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.setenv("DEMO_MODE", "maybe")
+
+    with pytest.raises(ValueError):
+        get_config()
+
+
+def test_get_config_rejects_invalid_demo_max_questions(monkeypatch) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.setenv("DEMO_MAX_QUESTIONS", "0")
+
+    with pytest.raises(ValueError):
+        get_config()

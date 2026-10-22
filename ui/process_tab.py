@@ -13,15 +13,19 @@ from src.vector_store import (
     upsert_embedded_chunks,
 )
 from ui.resources import get_cached_chroma_client, get_cached_embedding_model
+from ui.sample_notes import SAMPLE_NOTES_PATH
 
 
 def run_end_to_end_processing(
     uploaded_files,
     config: AppConfig,
     clear_existing_collection: bool,
-) -> None:
+) -> bool:
     """
     Run the full document processing pipeline from uploaded PDFs to ChromaDB.
+
+    Returns:
+        True if the notes were stored in ChromaDB.
     """
 
     with st.status("Processing PDFs...", expanded=True) as status:
@@ -57,7 +61,7 @@ def run_end_to_end_processing(
                 state="error",
             )
             st.warning(result.stopped_reason)
-            return
+            return False
 
         st.session_state.vector_store_message = (
             f"Stored {result.upserted_count} chunk(s). "
@@ -66,6 +70,61 @@ def run_end_to_end_processing(
 
         status.update(label="Processing complete.", state="complete")
         st.success(st.session_state.vector_store_message)
+
+    return True
+
+
+def process_and_report_errors(
+    uploaded_files,
+    config: AppConfig,
+    clear_existing_collection: bool,
+) -> bool:
+    """
+    Run end-to-end processing and show any pipeline error in the UI.
+
+    Returns:
+        True if the notes were stored in ChromaDB.
+    """
+
+    try:
+        return run_end_to_end_processing(
+            uploaded_files=uploaded_files,
+            config=config,
+            clear_existing_collection=clear_existing_collection,
+        )
+    except ChunkingError as exc:
+        st.error(f"Chunking error: {exc}")
+    except EmbeddingError as exc:
+        st.error(f"Embedding error: {exc}")
+    except VectorStoreError as exc:
+        st.error(f"Vector store error: {exc}")
+    except Exception as exc:
+        st.error(f"Unexpected processing error: {exc}")
+
+    return False
+
+
+def display_sample_notes_option(config: AppConfig) -> None:
+    """
+    Offer bundled sample notes so the app can be tried without any PDFs.
+    """
+
+    with st.container(border=True):
+        st.markdown("**No lecture notes at hand?**")
+        st.caption(
+            "Load an 8-page set of Data Structures and Algorithms notes that ships with "
+            "the project, then try the example questions in the Ask questions tab."
+        )
+
+        if st.button("Try with sample notes"):
+            with SAMPLE_NOTES_PATH.open("rb") as sample_file:
+                stored = process_and_report_errors(
+                    uploaded_files=[sample_file],
+                    config=config,
+                    clear_existing_collection=True,
+                )
+
+            st.session_state.sample_notes_loaded = stored
 
 
 def display_manual_processing_controls(
@@ -215,6 +274,8 @@ def display_process_tab(config: AppConfig) -> None:
         """
     )
 
+    display_sample_notes_option(config)
+
     uploaded_files = st.file_uploader(
         "Upload one or more PDF lecture notes",
         type=["pdf"],
@@ -246,20 +307,14 @@ def display_process_tab(config: AppConfig) -> None:
     )
 
     if process_clicked:
-        try:
-            run_end_to_end_processing(
-                uploaded_files=uploaded_files,
-                config=config,
-                clear_existing_collection=clear_existing_collection,
-            )
-        except ChunkingError as exc:
-            st.error(f"Chunking error: {exc}")
-        except EmbeddingError as exc:
-            st.error(f"Embedding error: {exc}")
-        except VectorStoreError as exc:
-            st.error(f"Vector store error: {exc}")
-        except Exception as exc:
-            st.error(f"Unexpected processing error: {exc}")
+        stored = process_and_report_errors(
+            uploaded_files=uploaded_files,
+            config=config,
+            clear_existing_collection=clear_existing_collection,
+        )
+
+        if stored:
+            st.session_state.sample_notes_loaded = False
 
     display_manual_processing_controls(
         uploaded_files=uploaded_files,
