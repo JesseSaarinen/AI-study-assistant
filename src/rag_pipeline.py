@@ -1,9 +1,10 @@
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import openai
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from src.citations import build_source_citations, ensure_answer_has_citation_markers
 from src.embeddings import EmbeddingError, EmbeddingModel, generate_embeddings
@@ -131,7 +132,7 @@ class OpenAIChatModel:
         try:
             response = self.client.chat.completions.create(
                 model=model,
-                messages=messages,
+                messages=cast(list[ChatCompletionMessageParam], messages),
                 temperature=temperature,
                 max_tokens=700,
             )
@@ -161,7 +162,7 @@ class OpenAIChatModel:
         try:
             stream = self.client.chat.completions.create(
                 model=model,
-                messages=messages,
+                messages=cast(list[ChatCompletionMessageParam], messages),
                 temperature=temperature,
                 max_tokens=700,
                 stream=True,

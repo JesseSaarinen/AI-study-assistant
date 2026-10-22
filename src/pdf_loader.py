@@ -16,7 +16,8 @@ class UploadedPDFLike(Protocol):
     here so this module stays reusable and easy to test.
     """
 
-    name: str
+    @property
+    def name(self) -> str: ...
 
     def read(self) -> bytes: ...
 
