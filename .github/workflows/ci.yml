@@ -39,3 +39,30 @@ jobs:
 
       - name: Run tests
         run: pytest --cov --cov-report=term-missing
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build --tag ai-study-assistant:ci .
+
+      - name: Check the embedding model works offline
+        run: |
+          docker run --rm --network none ai-study-assistant:ci python -c \
+            "from src.embeddings import load_embedding_model; \
+            print(len(load_embedding_model('all-MiniLM-L6-v2').encode(['test'])[0]))"
+
+      - name: Check the app starts
+        run: |
+          docker run --detach --name app --publish 8501:8501 ai-study-assistant:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8501/_stcore/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs app
+          exit 1

@@ -1,0 +1,25 @@
+# Keep secrets, local data and development files out of the image.
+.env
+.streamlit/secrets.toml
+storage/
+.git/
+.github/
+.venv/
+venv/
+env/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+tests/
+eval/
+scripts/
+docs/
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore

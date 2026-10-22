@@ -1,0 +1,35 @@
+# Run the app:                 docker compose up --build
+# Run it fully offline:        docker compose --profile ollama up --build
+#
+# Settings come from .env (copy .env.example). For the offline setup, set
+#   OPENAI_BASE_URL=http://ollama:11434/v1
+#   OPENAI_API_KEY=ollama
+#   OPENAI_MODEL=llama3.2
+# and download the model once with: docker compose exec ollama ollama pull llama3.2
+
+services:
+  app:
+    build: .
+    image: ai-study-assistant
+    ports:
+      - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Keep the vector database on the volume, whatever .env says.
+      CHROMA_DB_DIR: /app/storage/chroma
+    volumes:
+      - notes:/app/storage
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  notes:
+  ollama-models:
