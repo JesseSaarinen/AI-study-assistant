@@ -66,8 +66,25 @@ class SourceCitation:
 class RagAnswer:
     """
     Represents the final RAG answer returned to the UI.
+
+    search_query is the question that was actually used for retrieval. It
+    differs from the user's question when a follow-up was rewritten.
     """
 
     answer: str
     sources: list[RetrievedChunk]
     citations: list[SourceCitation] = field(default_factory=list)
+    search_query: str = ""
+
+
+@dataclass(frozen=True)
+class ChatTurn:
+    """
+    One question and answer in a conversation.
+
+    Earlier turns let the pipeline rewrite follow-up questions such as
+    "why is that?" into standalone questions before retrieval.
+    """
+
+    question: str
+    answer: RagAnswer

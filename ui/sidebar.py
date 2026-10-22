@@ -33,6 +33,7 @@ def display_sidebar(config: AppConfig) -> None:
         st.write(f"Chunk size: `{config.chunk_size}`")
         st.write(f"Chunk overlap: `{config.chunk_overlap}`")
         st.write(f"Top K retrieval: `{config.top_k}`")
+        st.write(f"Follow-up history: `{config.chat_history_turns}` turn(s)")
 
         threshold_display = (
             "disabled"

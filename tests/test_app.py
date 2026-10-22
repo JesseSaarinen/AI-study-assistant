@@ -4,6 +4,7 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
+from src.rag_pipeline import ChatModelError
 from tests.helpers import FixedAnswerChatModel, KeywordFakeEmbeddingModel
 from ui.sample_notes import SAMPLE_QUESTIONS
 
@@ -62,9 +63,71 @@ def test_sample_notes_can_be_loaded_and_queried(app_env) -> None:
     app = click_button(app, SAMPLE_QUESTIONS[0])
 
     assert not app.exception
-    assert app.session_state.last_question == SAMPLE_QUESTIONS[0]
-    assert app.session_state.rag_answer.answer == "Amortised analysis. [Source 1]"
+    history = app.session_state.chat_history
+    assert len(history) == 1
+    assert history[0].question == SAMPLE_QUESTIONS[0]
+    assert history[0].answer.answer == "Amortised analysis. [Source 1]"
+    assert history[0].answer.sources
     assert app.session_state.questions_asked == 1
+    assert [message.name for message in app.chat_message] == ["user", "assistant"]
+
+
+def test_follow_up_question_is_rewritten_before_retrieval(app_env) -> None:
+    chat_model = FixedAnswerChatModel(
+        "Because the array doubles. [Source 1]",
+        rewrite="Why does a dynamic array double its capacity?",
+    )
+    app_env.setattr("ui.resources.OpenAIChatModel", lambda api_key, base_url: chat_model)
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = click_button(app, "Try with sample notes")
+    app = click_button(app, SAMPLE_QUESTIONS[0])
+    app = app.chat_input[0].set_value("Why is that?").run()
+
+    assert not app.exception
+    history = app.session_state.chat_history
+    assert [turn.question for turn in history] == [SAMPLE_QUESTIONS[0], "Why is that?"]
+    assert history[1].answer.search_query == "Why does a dynamic array double its capacity?"
+    assert any("Searched the notes for" in caption.value for caption in app.caption)
+
+    # First question: one answer call. Follow-up: one rewrite call, then one answer call.
+    assert len(chat_model.calls) == 3
+    rewrite_prompt = chat_model.calls[1][1]["content"]
+    assert SAMPLE_QUESTIONS[0] in rewrite_prompt
+    assert "Why is that?" in rewrite_prompt
+    assert "Why does a dynamic array double its capacity?" in chat_model.calls[2][1]["content"]
+
+
+def test_conversation_can_be_cleared(app_env) -> None:
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = click_button(app, "Try with sample notes")
+    app = click_button(app, SAMPLE_QUESTIONS[0])
+    app = click_button(app, "Clear conversation")
+
+    assert not app.exception
+    assert app.session_state.chat_history == []
+    assert not app.chat_message
+
+
+def test_chat_model_errors_are_shown_and_not_added_to_history(app_env) -> None:
+    class FailingChatModel(FixedAnswerChatModel):
+        def stream_answer(self, messages, model, temperature=0.0):
+            raise ChatModelError("The chat API rate limit or quota was reached.")
+            yield ""
+
+    app_env.setattr(
+        "ui.resources.OpenAIChatModel",
+        lambda api_key, base_url: FailingChatModel("unused"),
+    )
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = click_button(app, "Try with sample notes")
+    app = click_button(app, SAMPLE_QUESTIONS[0])
+
+    assert not app.exception
+    assert any("rate limit" in error.value for error in app.error)
+    assert app.session_state.chat_history == []
+    assert app.session_state.questions_asked == 0
 
 
 def test_demo_mode_limits_questions_per_session(app_env) -> None:
@@ -78,5 +141,5 @@ def test_demo_mode_limits_questions_per_session(app_env) -> None:
 
     assert not app.exception
     assert app.session_state.questions_asked == 1
-    assert app.session_state.last_question == SAMPLE_QUESTIONS[0]
+    assert [turn.question for turn in app.session_state.chat_history] == [SAMPLE_QUESTIONS[0]]
     assert any("demo limit" in warning.value for warning in app.warning)
