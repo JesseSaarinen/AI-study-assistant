@@ -28,3 +28,11 @@ select = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["src", "ui", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["app.py", "src", "ui", "scripts"]
+check_untyped_defs = true
+warn_unused_ignores = true
+# chromadb, fastembed and pymupdf ship without complete type information.
+ignore_missing_imports = true

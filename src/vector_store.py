@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.api import ClientAPI
 from chromadb.config import Settings
 
 from src.models import EmbeddedChunk, RetrievedChunk
@@ -65,7 +66,7 @@ def validate_collection_name(collection_name: str) -> None:
         raise InvalidCollectionNameError("ChromaDB collection name cannot be an IPv4 address.")
 
 
-def get_chroma_client(chroma_db_dir: str | Path) -> chromadb.PersistentClient:
+def get_chroma_client(chroma_db_dir: str | Path) -> ClientAPI:
     """
     Create a persistent ChromaDB client.
 
@@ -89,7 +90,7 @@ def get_chroma_client(chroma_db_dir: str | Path) -> chromadb.PersistentClient:
 
 
 def get_or_create_collection(
-    client: chromadb.PersistentClient,
+    client: ClientAPI,
     collection_name: str = DEFAULT_COLLECTION_NAME,
 ) -> Any:
     """
@@ -113,7 +114,7 @@ def get_or_create_collection(
 
 
 def reset_collection(
-    client: chromadb.PersistentClient,
+    client: ClientAPI,
     collection_name: str = DEFAULT_COLLECTION_NAME,
 ) -> None:
     """

@@ -226,13 +226,11 @@ def main() -> None:
     print(f"\nWrote {args.output}\n")
     print(report)
 
-    below_target = (
+    if (
         args.fail_under is not None
         and default_hit_rate is not None
         and default_hit_rate < args.fail_under
-    )
-
-    if below_target:
+    ):
         sys.exit(
             f"Hit@1 for the app default is {percent(default_hit_rate)}, "
             f"below the required {percent(args.fail_under)}."

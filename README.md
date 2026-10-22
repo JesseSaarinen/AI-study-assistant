@@ -22,7 +22,7 @@ It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB,
 - **Measured, not guessed.** A labelled question set and an evaluation script compare embedding models, chunk sizes and distance thresholds, and the results set the app's defaults. A second script grades the answers themselves: refusals, citations, and an LLM judge for faithfulness. [Retrieval results](#retrieval-evaluation) and [answer evaluation](#answer-evaluation) below.
 - **Light enough for free hosting.** Embeddings run on ONNX Runtime through FastEmbed, so the install is about 1 GB instead of 6.6 GB with PyTorch.
 - **Ready for a public demo.** Bundled sample notes, one-click example questions, and a demo mode that isolates each visitor's notes and caps API usage.
-- **Tested.** 183 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff, the tests and a Docker build with a start-up check on every pull request and every push to `main`.
+- **Tested.** 183 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff, mypy, the tests and a Docker build with a start-up check on every pull request and every push to `main`.
 
 ## How it works
 
@@ -208,8 +208,8 @@ AI-study-assistant/
 ├── Dockerfile              # app image with the embedding model built in
 ├── docker-compose.yml      # the app, plus an optional Ollama container
 ├── requirements.txt        # runtime dependencies
-├── requirements-dev.txt    # adds pytest and ruff
-└── pyproject.toml          # pytest, coverage and ruff settings
+├── requirements-dev.txt    # adds pytest, ruff and mypy
+└── pyproject.toml          # pytest, coverage, ruff and mypy settings
 ```
 
 ## Configuration
@@ -241,6 +241,7 @@ For notes in Finnish or other languages, set `EMBEDDING_MODEL_NAME=paraphrase-mu
 pytest                                  # 183 tests, no network access needed
 pytest --cov --cov-report=term-missing  # with coverage
 ruff check . && ruff format --check .   # lint and format
+mypy                                    # type check
 python scripts/evaluate_retrieval.py    # retrieval evaluation, downloads the models
 python scripts/evaluate_answers.py      # answer evaluation, needs a chat API key
 ```

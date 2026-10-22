@@ -1,5 +1,6 @@
 import random
 import uuid
+from functools import partial
 
 import streamlit as st
 
@@ -97,6 +98,10 @@ def display_feedback(question: QuizQuestion, selected_index: int | None) -> None
     st.caption(f"{explanation}Source: {source}")
 
 
+def format_option(question: QuizQuestion, index: int) -> str:
+    return f"{OPTION_LETTERS[index]}. {question.options[index]}"
+
+
 def display_quiz(questions: list[QuizQuestion]) -> None:
     """
     Show the quiz as a form, with the score and feedback once it is checked.
@@ -120,9 +125,7 @@ def display_quiz(questions: list[QuizQuestion]) -> None:
             selected_index = st.radio(
                 f"Answer to question {number}",
                 options=list(range(len(question.options))),
-                format_func=lambda index, q=question: (
-                    f"{OPTION_LETTERS[index]}. {q.options[index]}"
-                ),
+                format_func=partial(format_option, question),
                 index=None,
                 key=answer_key(quiz_id, number),
                 label_visibility="collapsed",

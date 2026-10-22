@@ -181,8 +181,7 @@ def build_report(args, config, judge_model_name: str, results: list[AnswerEvalRe
         "",
     ]
 
-    flagged = [(result, needs_review(result)) for result in results]
-    flagged = [(result, reason) for result, reason in flagged if reason]
+    flagged = [(result, reason) for result in results if (reason := needs_review(result))]
 
     if flagged:
         lines += ["| Question | Why |", "|---|---|"]
