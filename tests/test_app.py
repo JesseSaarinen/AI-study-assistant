@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,7 @@ def test_app_renders_without_errors(app_env) -> None:
         "1. Process notes",
         "2. Inspect data",
         "3. Ask questions",
+        "4. Practice",
     ]
 
 
@@ -143,3 +145,71 @@ def test_demo_mode_limits_questions_per_session(app_env) -> None:
     assert app.session_state.questions_asked == 1
     assert [turn.question for turn in app.session_state.chat_history] == [SAMPLE_QUESTIONS[0]]
     assert any("demo limit" in warning.value for warning in app.warning)
+
+
+def test_practice_quiz_can_be_generated_and_checked(app_env) -> None:
+    quiz = [
+        {
+            "question": "Why is appending to a dynamic array cheap on average?",
+            "options": [
+                "Resizes are rare",
+                "Arrays are sorted",
+                "Memory is free",
+                "It uses a heap",
+            ],
+            "correct_option": "Resizes are rare",
+            "explanation": "Doubling the capacity makes resizes rare.",
+            "source": 1,
+        },
+        {
+            "question": "What does LIFO describe?",
+            "options": ["A stack", "A queue", "A hash table", "A heap"],
+            "correct_option": "A stack",
+            "explanation": "A stack removes the newest item first.",
+            "source": 1,
+        },
+    ]
+    chat_model = FixedAnswerChatModel("unused", quiz=json.dumps(quiz))
+    app_env.setattr("ui.resources.OpenAIChatModel", lambda api_key, base_url: chat_model)
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = click_button(app, "Try with sample notes")
+    app.slider[0].set_value(2)
+    app = click_button(app, "Generate quiz")
+
+    assert not app.exception
+    questions = app.session_state.quiz
+    assert [question.question for question in questions] == [item["question"] for item in quiz]
+    assert app.session_state.questions_asked == 1
+
+    quiz_id = app.session_state.quiz_id
+    first, second = questions
+    app.radio(key=f"quiz_{quiz_id}_1").set_value(first.correct_index)
+    app.radio(key=f"quiz_{quiz_id}_2").set_value((second.correct_index + 1) % 4)
+    app = click_button(app, "Check answers")
+
+    assert not app.exception
+    assert any(header.value == "Score: 1 / 2" for header in app.subheader)
+    assert any("Source: dsa_lecture_notes.pdf, page" in caption.value for caption in app.caption)
+
+
+def test_new_notes_clear_the_quiz(app_env) -> None:
+    quiz = [
+        {
+            "question": "What does LIFO describe?",
+            "options": ["A stack", "A queue", "A hash table", "A heap"],
+            "correct_option": "A stack",
+            "source": 1,
+        }
+    ]
+    chat_model = FixedAnswerChatModel("unused", quiz=json.dumps(quiz))
+    app_env.setattr("ui.resources.OpenAIChatModel", lambda api_key, base_url: chat_model)
+
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
+    app = click_button(app, "Try with sample notes")
+    app = click_button(app, "Generate quiz")
+    assert len(app.session_state.quiz) == 1
+
+    app = click_button(app, "Try with sample notes")
+
+    assert app.session_state.quiz == []

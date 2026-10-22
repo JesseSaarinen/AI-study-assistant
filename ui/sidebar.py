@@ -19,7 +19,7 @@ def display_sidebar(config: AppConfig) -> None:
         if config.demo_mode:
             st.info(
                 "Public demo: notes you process are stored only for your browser session, "
-                f"with up to {config.demo_max_questions} questions per session."
+                f"with up to {config.demo_max_questions} questions or quizzes per session."
             )
 
         if has_api_key(config):

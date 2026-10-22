@@ -8,6 +8,7 @@ import streamlit as st
 from src.config import ensure_storage_dir, get_config
 from ui.ask_tab import display_ask_tab
 from ui.inspect_tab import display_inspect_tab
+from ui.practice_tab import display_practice_tab
 from ui.process_tab import display_process_tab
 from ui.sidebar import display_sidebar
 from ui.state import initialise_session_state, session_collection_name
@@ -63,16 +64,18 @@ def main() -> None:
 
     st.write(
         """
-        Upload lecture notes as PDFs, turn them into searchable embeddings, and ask
-        questions grounded in your uploaded material.
+        Upload lecture notes as PDFs, turn them into searchable embeddings, ask
+        questions grounded in your uploaded material, and test yourself with
+        quizzes written from it.
         """
     )
 
-    process_tab, inspect_tab, ask_tab = st.tabs(
+    process_tab, inspect_tab, ask_tab, practice_tab = st.tabs(
         [
             "1. Process notes",
             "2. Inspect data",
             "3. Ask questions",
+            "4. Practice",
         ]
     )
 
@@ -84,6 +87,9 @@ def main() -> None:
 
     with ask_tab:
         display_ask_tab(config, stored_count)
+
+    with practice_tab:
+        display_practice_tab(config, stored_count)
 
 
 if __name__ == "__main__":

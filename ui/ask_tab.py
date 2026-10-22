@@ -17,7 +17,7 @@ from src.ui_helpers import format_source_label
 from src.vector_store import get_or_create_collection
 from ui.resources import get_cached_chat_model, get_cached_chroma_client, get_cached_embedding_model
 from ui.sample_notes import SAMPLE_QUESTIONS
-from ui.state import clear_conversation
+from ui.state import clear_conversation, demo_limit_reached
 
 STREAMING_CURSOR = "▌"
 
@@ -233,14 +233,6 @@ def display_example_questions() -> str | None:
     return clicked_question
 
 
-def demo_question_limit_reached(config: AppConfig) -> bool:
-    """
-    Return True when a public demo session has used up its question budget.
-    """
-
-    return config.demo_mode and st.session_state.questions_asked >= config.demo_max_questions
-
-
 def display_ask_tab(config: AppConfig, stored_count: int) -> None:
     """
     Display the question-answering tab.
@@ -289,7 +281,7 @@ def display_ask_tab(config: AppConfig, stored_count: int) -> None:
             display_turn(turn, turn_index)
 
         if question and question.strip():
-            if demo_question_limit_reached(config):
+            if demo_limit_reached(config):
                 st.warning(
                     f"You have reached the demo limit of {config.demo_max_questions} "
                     "question(s) for this session. Run the app locally with your own API key "
