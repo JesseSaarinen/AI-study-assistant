@@ -1,6 +1,5 @@
 from src.models import RetrievedChunk
 
-
 ANSWER_NOT_FOUND = "I could not find this in the uploaded notes."
 
 

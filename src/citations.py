@@ -2,7 +2,6 @@ import re
 
 from src.models import RetrievedChunk, SourceCitation
 
-
 # Matches bracketed citation groups such as:
 # [Source 1]
 # [Source 1, Source 2]
@@ -99,9 +98,7 @@ def select_citations_referenced_in_answer(
 
     referenced_numbers = extract_source_numbers(answer)
 
-    citations_by_number = {
-        citation.source_number: citation for citation in citations
-    }
+    citations_by_number = {citation.source_number: citation for citation in citations}
 
     return [
         citations_by_number[source_number]
@@ -179,8 +176,6 @@ def ensure_answer_has_citation_markers(
     if answer_has_source_markers(cleaned_answer):
         return cleaned_answer
 
-    source_markers = ", ".join(
-        f"[Source {citation.source_number}]" for citation in citations
-    )
+    source_markers = ", ".join(f"[Source {citation.source_number}]" for citation in citations)
 
     return f"{cleaned_answer}\n\nSources: {source_markers}"

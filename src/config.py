@@ -4,6 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# Chosen with scripts/evaluate_retrieval.py: for all-MiniLM-L6-v2 on the sample
+# notes, 0.8 keeps every answerable question while rejecting far more off-topic
+# questions than 1.0. The best value depends on the embedding model.
+DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD = 0.8
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -20,8 +25,10 @@ class AppConfig:
     chunk_overlap: int
     top_k: int
     chroma_collection_name: str = "study_notes"
-    retrieval_distance_threshold: float | None = 1.0
+    retrieval_distance_threshold: float | None = DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD
     max_uploaded_file_mb: int = 50
+    demo_mode: bool = False
+    demo_max_questions: int = 20
 
 
 def _get_int_env(name: str, default: int) -> int:
@@ -41,6 +48,30 @@ def _get_int_env(name: str, default: int) -> int:
         return int(raw_value)
     except ValueError as exc:
         raise ValueError(f"{name} must be an integer. Got: {raw_value}") from exc
+
+
+def _get_bool_env(name: str, default: bool) -> bool:
+    """
+    Read a boolean environment variable such as true/false, yes/no, or 1/0.
+
+    Raises:
+        ValueError: If the environment variable exists but is not a boolean.
+    """
+
+    raw_value = os.getenv(name)
+
+    if raw_value is None or raw_value.strip() == "":
+        return default
+
+    cleaned_value = raw_value.strip().lower()
+
+    if cleaned_value in {"true", "yes", "1", "on"}:
+        return True
+
+    if cleaned_value in {"false", "no", "0", "off"}:
+        return False
+
+    raise ValueError(f"{name} must be true or false. Got: {raw_value}")
 
 
 def _get_optional_float_env(name: str, default: float | None) -> float | None:
@@ -76,6 +107,7 @@ def _validate_config_values(
     top_k: int,
     retrieval_distance_threshold: float | None,
     max_uploaded_file_mb: int,
+    demo_max_questions: int = 20,
 ) -> None:
     """
     Validate numeric configuration values.
@@ -99,6 +131,9 @@ def _validate_config_values(
     if max_uploaded_file_mb <= 0:
         raise ValueError("MAX_UPLOADED_FILE_MB must be greater than 0.")
 
+    if demo_max_questions <= 0:
+        raise ValueError("DEMO_MAX_QUESTIONS must be greater than 0.")
+
 
 def get_config() -> AppConfig:
     """
@@ -112,9 +147,11 @@ def get_config() -> AppConfig:
     top_k = _get_int_env("TOP_K", 5)
     retrieval_distance_threshold = _get_optional_float_env(
         "RETRIEVAL_DISTANCE_THRESHOLD",
-        1.0,
+        DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD,
     )
     max_uploaded_file_mb = _get_int_env("MAX_UPLOADED_FILE_MB", 50)
+    demo_mode = _get_bool_env("DEMO_MODE", False)
+    demo_max_questions = _get_int_env("DEMO_MAX_QUESTIONS", 20)
 
     _validate_config_values(
         chunk_size=chunk_size,
@@ -122,6 +159,7 @@ def get_config() -> AppConfig:
         top_k=top_k,
         retrieval_distance_threshold=retrieval_distance_threshold,
         max_uploaded_file_mb=max_uploaded_file_mb,
+        demo_max_questions=demo_max_questions,
     )
 
     chroma_collection_name = os.getenv(
@@ -141,6 +179,8 @@ def get_config() -> AppConfig:
         chroma_collection_name=chroma_collection_name or "study_notes",
         retrieval_distance_threshold=retrieval_distance_threshold,
         max_uploaded_file_mb=max_uploaded_file_mb,
+        demo_mode=demo_mode,
+        demo_max_questions=demo_max_questions,
     )
 
 

@@ -1,14 +1,18 @@
+import math
 from collections.abc import Iterable, Sequence
 from typing import Any, Protocol
 
-from sentence_transformers import SentenceTransformer
-
 from src.models import EmbeddedChunk, TextChunk
+
+DEFAULT_MODEL_NAMESPACE = "sentence-transformers"
 
 
 class EmbeddingModel(Protocol):
     """
-    Minimal interface needed from a Sentence Transformers style model.
+    Minimal interface needed from an embedding model.
+
+    It mirrors SentenceTransformer.encode, so FastEmbedModel, a Sentence
+    Transformers model, or a fake test model can all be used.
 
     This allows us to test embedding logic with a fake model without downloading
     the real model during pytest.
@@ -20,8 +24,7 @@ class EmbeddingModel(Protocol):
         batch_size: int = 32,
         show_progress_bar: bool = False,
         normalize_embeddings: bool = True,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 class EmbeddingError(Exception):
@@ -42,18 +45,80 @@ class EmbeddingGenerationError(EmbeddingError):
     """
 
 
-def load_embedding_model(model_name: str) -> SentenceTransformer:
+def _normalise_vector(vector: list[float]) -> list[float]:
     """
-    Load a Sentence Transformers model.
+    Scale a vector to unit length so cosine distance behaves consistently.
+    """
+
+    norm = math.sqrt(sum(value * value for value in vector))
+
+    if norm == 0:
+        return vector
+
+    return [value / norm for value in vector]
+
+
+def resolve_model_name(model_name: str) -> str:
+    """
+    Expand short Sentence Transformers names such as all-MiniLM-L6-v2.
+
+    FastEmbed identifies models by their full Hugging Face name, while the app
+    has always accepted the short name in EMBEDDING_MODEL_NAME.
+    """
+
+    cleaned_model_name = model_name.strip()
+
+    if "/" in cleaned_model_name:
+        return cleaned_model_name
+
+    return f"{DEFAULT_MODEL_NAMESPACE}/{cleaned_model_name}"
+
+
+class FastEmbedModel:
+    """
+    Embedding model that runs Sentence Transformers checkpoints with ONNX Runtime.
+
+    FastEmbed gives the same vectors as the PyTorch version of these models
+    without installing PyTorch, which keeps the install around 1 GB instead of
+    several GB and makes the app small enough for free hosting.
+    """
+
+    def __init__(self, model_name: str) -> None:
+        from fastembed import TextEmbedding
+
+        self.model_name = resolve_model_name(model_name)
+        self._model = TextEmbedding(model_name=self.model_name)
+
+    def encode(
+        self,
+        sentences: list[str],
+        batch_size: int = 32,
+        show_progress_bar: bool = False,
+        normalize_embeddings: bool = True,
+    ) -> list[list[float]]:
+        vectors = [
+            [float(value) for value in vector]
+            for vector in self._model.embed(sentences, batch_size=batch_size)
+        ]
+
+        if normalize_embeddings:
+            return [_normalise_vector(vector) for vector in vectors]
+
+        return vectors
+
+
+def load_embedding_model(model_name: str) -> FastEmbedModel:
+    """
+    Load an embedding model.
 
     The first time this runs, the model may be downloaded from Hugging Face.
     Later runs usually load from the local cache.
 
     Args:
-        model_name: Name of the Sentence Transformers model.
+        model_name: Sentence Transformers model name, for example all-MiniLM-L6-v2.
 
     Returns:
-        A loaded SentenceTransformer model.
+        A loaded embedding model.
 
     Raises:
         EmbeddingModelLoadError: If the model name is missing or loading fails.
@@ -65,7 +130,7 @@ def load_embedding_model(model_name: str) -> SentenceTransformer:
         raise EmbeddingModelLoadError("Embedding model name cannot be empty.")
 
     try:
-        return SentenceTransformer(cleaned_model_name)
+        return FastEmbedModel(cleaned_model_name)
     except Exception as exc:
         raise EmbeddingModelLoadError(
             f"Could not load embedding model '{cleaned_model_name}'. "
@@ -82,9 +147,7 @@ def _vector_to_float_list(vector: Any) -> list[float]:
         vector = vector.tolist()
 
     if not isinstance(vector, Sequence) or isinstance(vector, str | bytes):
-        raise EmbeddingGenerationError(
-            "Embedding model returned an invalid vector format."
-        )
+        raise EmbeddingGenerationError("Embedding model returned an invalid vector format.")
 
     try:
         float_vector = [float(value) for value in vector]
@@ -103,19 +166,15 @@ def _embedding_output_to_lists(raw_embeddings: Any) -> list[list[float]]:
     """
     Convert model output into a list of float vectors.
 
-    Sentence Transformers usually returns a NumPy array, but fake test models may
-    return normal Python lists. This function handles both.
+    Real models may return NumPy arrays, while fake test models return normal
+    Python lists. This function handles both.
     """
 
     if hasattr(raw_embeddings, "tolist"):
         raw_embeddings = raw_embeddings.tolist()
 
-    if not isinstance(raw_embeddings, Sequence) or isinstance(
-        raw_embeddings, str | bytes
-    ):
-        raise EmbeddingGenerationError(
-            "Embedding model returned an invalid embeddings format."
-        )
+    if not isinstance(raw_embeddings, Sequence) or isinstance(raw_embeddings, str | bytes):
+        raise EmbeddingGenerationError("Embedding model returned an invalid embeddings format.")
 
     return [_vector_to_float_list(vector) for vector in raw_embeddings]
 
@@ -132,10 +191,10 @@ def generate_embeddings(
 
     Args:
         texts: Text values to embed.
-        model: Sentence Transformers compatible model.
+        model: Embedding model with an encode() method.
         batch_size: Number of texts to process per batch.
         normalize_embeddings: Whether to normalise embeddings to unit length.
-        show_progress_bar: Whether to show the Sentence Transformers progress bar.
+        show_progress_bar: Whether to show a progress bar, if the model supports one.
 
     Returns:
         A list of embedding vectors.
@@ -185,7 +244,7 @@ def embed_chunks(
 
     Args:
         chunks: Text chunks to embed.
-        model: Sentence Transformers compatible model.
+        model: Embedding model with an encode() method.
         batch_size: Number of chunks to process per batch.
 
     Returns:

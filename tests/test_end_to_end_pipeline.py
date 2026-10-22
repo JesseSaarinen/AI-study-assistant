@@ -1,7 +1,7 @@
 from src.chunker import chunk_pages
 from src.embeddings import embed_chunks
-from src.prompts import ANSWER_NOT_FOUND
 from src.pdf_loader import extract_text_from_pdf
+from src.prompts import ANSWER_NOT_FOUND
 from src.rag_pipeline import answer_question
 from src.vector_store import (
     get_chroma_client,
@@ -26,12 +26,7 @@ def test_full_local_rag_pipeline_without_external_api(tmp_path) -> None:
     """
 
     pdf_bytes = create_pdf_with_pages(
-        [
-            (
-                "Recursion is when a function calls itself. "
-                "A base case stops the recursive calls."
-            )
-        ]
+        [("Recursion is when a function calls itself. A base case stops the recursive calls.")]
     )
 
     uploaded_file = FakeUploadedFile("algorithms.pdf", pdf_bytes)
@@ -67,7 +62,7 @@ def test_full_local_rag_pipeline_without_external_api(tmp_path) -> None:
     assert len(embedded_chunks) == len(chunks)
 
     client = get_chroma_client(tmp_path)
-    collection = get_or_create_collection(client, "phase10_notes")
+    collection = get_or_create_collection(client, "e2e_notes")
 
     upserted_count = upsert_embedded_chunks(
         collection=collection,
@@ -77,9 +72,7 @@ def test_full_local_rag_pipeline_without_external_api(tmp_path) -> None:
     assert upserted_count == len(embedded_chunks)
     assert get_collection_count(collection) == len(embedded_chunks)
 
-    chat_model = FixedAnswerChatModel(
-        "Recursion is when a function calls itself. [Source 1]"
-    )
+    chat_model = FixedAnswerChatModel("Recursion is when a function calls itself. [Source 1]")
 
     rag_answer = answer_question(
         question="What is recursion?",
@@ -107,11 +100,7 @@ def test_full_local_rag_pipeline_returns_fallback_when_threshold_filters_context
     Test that weak retrieval results are filtered before calling the chat model.
     """
 
-    pdf_bytes = create_pdf_with_pages(
-        [
-            "Recursion is when a function calls itself."
-        ]
-    )
+    pdf_bytes = create_pdf_with_pages(["Recursion is when a function calls itself."])
 
     uploaded_file = FakeUploadedFile("algorithms.pdf", pdf_bytes)
 
@@ -130,7 +119,7 @@ def test_full_local_rag_pipeline_returns_fallback_when_threshold_filters_context
     embedded_chunks = embed_chunks(chunks=chunks, model=embedding_model)
 
     client = get_chroma_client(tmp_path)
-    collection = get_or_create_collection(client, "phase10_threshold_notes")
+    collection = get_or_create_collection(client, "e2e_threshold_notes")
 
     upsert_embedded_chunks(
         collection=collection,
@@ -159,14 +148,10 @@ def test_rag_pipeline_appends_citations_when_chat_model_forgets_markers(
     tmp_path,
 ) -> None:
     """
-    Test the Phase 8 citation fallback inside the full RAG pipeline.
+    Test the citation fallback inside the full RAG pipeline.
     """
 
-    pdf_bytes = create_pdf_with_pages(
-        [
-            "Recursion is when a function calls itself."
-        ]
-    )
+    pdf_bytes = create_pdf_with_pages(["Recursion is when a function calls itself."])
 
     uploaded_file = FakeUploadedFile("algorithms.pdf", pdf_bytes)
 
@@ -185,16 +170,14 @@ def test_rag_pipeline_appends_citations_when_chat_model_forgets_markers(
     embedded_chunks = embed_chunks(chunks=chunks, model=embedding_model)
 
     client = get_chroma_client(tmp_path)
-    collection = get_or_create_collection(client, "phase10_citation_notes")
+    collection = get_or_create_collection(client, "e2e_citation_notes")
 
     upsert_embedded_chunks(
         collection=collection,
         embedded_chunks=embedded_chunks,
     )
 
-    chat_model = FixedAnswerChatModel(
-        "Recursion is when a function calls itself."
-    )
+    chat_model = FixedAnswerChatModel("Recursion is when a function calls itself.")
 
     rag_answer = answer_question(
         question="What is recursion?",

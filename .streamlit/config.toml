@@ -1,0 +1,9 @@
+[server]
+# Matches the default MAX_UPLOADED_FILE_MB so the uploader rejects large files early.
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#4F6BED"
