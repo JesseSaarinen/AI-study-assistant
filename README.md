@@ -11,7 +11,7 @@ It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB,
 
 **[Try the live demo](https://ai-study-assistant-jesse.streamlit.app)**: click **Try with sample notes**, then pick an example question. No account or API key needed. The app may take a minute to wake up if nobody has used it recently.
 
-![Answer with citations](docs/AI-assistant-answer-example.png)
+![Demo: loading the sample notes, asking a question and a follow-up, and taking a practice quiz](docs/demo.gif)
 
 ## Highlights
 
@@ -124,7 +124,11 @@ The app has four tabs that follow the pipeline:
 3. **Ask questions.** Chat about the stored notes and ask follow-up questions. Under each answer, a sources panel lists the citations and the retrieved chunks with their distance scores, with the cited ones marked.
 4. **Practice.** Generate a multiple-choice quiz on a topic or across all of the notes. Checking the answers shows the score, an explanation and the source page for each question, and the questions download as a CSV that Anki and most flashcard apps import.
 
-![Upload and processing](docs/AI-assistant-uploadfile-example.png)
+![A follow-up question answered from the notes, with the sources panel open](docs/demo-chat.png)
+
+![A checked practice quiz with the score, explanations and source pages](docs/demo-quiz.png)
+
+The GIF and screenshots come from [`scripts/record_demo.py`](scripts/record_demo.py), which drives the app in a browser with Playwright and a real chat model. Adding the `record-demo` label to a pull request records them again.
 
 ## Retrieval evaluation
 
@@ -201,10 +205,10 @@ AI-study-assistant/
 ├── ui/                     # Streamlit components, one module per tab
 ├── tests/                  # one test module per source module, plus app tests
 ├── eval/                   # labelled questions and the latest results
-├── scripts/                # sample notes builder and evaluation scripts
+├── scripts/                # sample notes builder, evaluation and demo scripts
 ├── sample_data/            # bundled sample lecture notes (PDF)
-├── docs/                   # deployment guide and screenshots
-├── .github/workflows/      # CI, retrieval evaluation and answer evaluation
+├── docs/                   # deployment guide, demo GIF and screenshots
+├── .github/workflows/      # CI, retrieval and answer evaluation, demo recording
 ├── Dockerfile              # app image with the embedding model built in
 ├── docker-compose.yml      # the app, plus an optional Ollama container
 ├── requirements.txt        # runtime dependencies
