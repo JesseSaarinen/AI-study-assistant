@@ -29,6 +29,7 @@ class AppConfig:
     max_uploaded_file_mb: int = 50
     demo_mode: bool = False
     demo_max_questions: int = 20
+    chat_history_turns: int = 3
 
 
 def _get_int_env(name: str, default: int) -> int:
@@ -108,6 +109,7 @@ def _validate_config_values(
     retrieval_distance_threshold: float | None,
     max_uploaded_file_mb: int,
     demo_max_questions: int = 20,
+    chat_history_turns: int = 3,
 ) -> None:
     """
     Validate numeric configuration values.
@@ -134,6 +136,9 @@ def _validate_config_values(
     if demo_max_questions <= 0:
         raise ValueError("DEMO_MAX_QUESTIONS must be greater than 0.")
 
+    if chat_history_turns < 0:
+        raise ValueError("CHAT_HISTORY_TURNS cannot be negative.")
+
 
 def get_config() -> AppConfig:
     """
@@ -152,6 +157,7 @@ def get_config() -> AppConfig:
     max_uploaded_file_mb = _get_int_env("MAX_UPLOADED_FILE_MB", 50)
     demo_mode = _get_bool_env("DEMO_MODE", False)
     demo_max_questions = _get_int_env("DEMO_MAX_QUESTIONS", 20)
+    chat_history_turns = _get_int_env("CHAT_HISTORY_TURNS", 3)
 
     _validate_config_values(
         chunk_size=chunk_size,
@@ -160,6 +166,7 @@ def get_config() -> AppConfig:
         retrieval_distance_threshold=retrieval_distance_threshold,
         max_uploaded_file_mb=max_uploaded_file_mb,
         demo_max_questions=demo_max_questions,
+        chat_history_turns=chat_history_turns,
     )
 
     chroma_collection_name = os.getenv(
@@ -181,6 +188,7 @@ def get_config() -> AppConfig:
         max_uploaded_file_mb=max_uploaded_file_mb,
         demo_mode=demo_mode,
         demo_max_questions=demo_max_questions,
+        chat_history_turns=chat_history_turns,
     )
 
 

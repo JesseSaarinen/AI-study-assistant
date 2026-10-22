@@ -14,6 +14,7 @@ from src.vector_store import (
 )
 from ui.resources import get_cached_chroma_client, get_cached_embedding_model
 from ui.sample_notes import SAMPLE_NOTES_PATH
+from ui.state import clear_conversation
 
 
 def run_end_to_end_processing(
@@ -50,7 +51,7 @@ def run_end_to_end_processing(
         st.session_state.text_chunks = result.chunks
         st.session_state.embedded_chunks = result.embedded_chunks
         st.session_state.vector_store_message = ""
-        st.session_state.rag_answer = None
+        clear_conversation()
 
         if result.extraction_errors:
             st.write(f"Extraction completed with {len(result.extraction_errors)} warning(s).")
@@ -185,7 +186,7 @@ def display_manual_processing_controls(
             st.session_state.text_chunks = []
             st.session_state.embedded_chunks = []
             st.session_state.vector_store_message = ""
-            st.session_state.rag_answer = None
+            clear_conversation()
 
             if pages:
                 st.success(f"Extracted text from {len(pages)} page(s).")
@@ -204,7 +205,7 @@ def display_manual_processing_controls(
                 st.session_state.text_chunks = chunks
                 st.session_state.embedded_chunks = []
                 st.session_state.vector_store_message = ""
-                st.session_state.rag_answer = None
+                clear_conversation()
 
                 st.success(f"Created {len(chunks)} chunk(s).")
 
@@ -224,7 +225,7 @@ def display_manual_processing_controls(
 
                 st.session_state.embedded_chunks = embedded_chunks
                 st.session_state.vector_store_message = ""
-                st.session_state.rag_answer = None
+                clear_conversation()
 
                 st.success(f"Generated embeddings for {len(embedded_chunks)} chunk(s).")
 
@@ -252,7 +253,7 @@ def display_manual_processing_controls(
                     f"Stored {upserted_count} chunk(s). "
                     f"Collection now contains {total_count} chunk(s)."
                 )
-                st.session_state.rag_answer = None
+                clear_conversation()
 
                 st.success(st.session_state.vector_store_message)
 
@@ -343,7 +344,7 @@ def display_process_tab(config: AppConfig) -> None:
                 )
 
                 st.session_state.vector_store_message = ""
-                st.session_state.rag_answer = None
+                clear_conversation()
 
                 st.success("ChromaDB collection deleted.")
 

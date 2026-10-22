@@ -14,8 +14,7 @@ def initialise_session_state() -> None:
         "text_chunks": [],
         "embedded_chunks": [],
         "vector_store_message": "",
-        "rag_answer": None,
-        "last_question": "",
+        "chat_history": [],
         "questions_asked": 0,
         "sample_notes_loaded": False,
     }
@@ -37,8 +36,18 @@ def clear_working_state() -> None:
     st.session_state.text_chunks = []
     st.session_state.embedded_chunks = []
     st.session_state.vector_store_message = ""
-    st.session_state.rag_answer = None
-    st.session_state.last_question = ""
+    clear_conversation()
+
+
+def clear_conversation() -> None:
+    """
+    Forget the questions and answers asked so far.
+
+    Called when the stored notes change, because earlier answers may cite
+    chunks that no longer exist.
+    """
+
+    st.session_state.chat_history = []
 
 
 def session_collection_name(base_name: str) -> str:

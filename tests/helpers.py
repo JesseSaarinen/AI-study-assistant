@@ -1,8 +1,10 @@
 import io
+from collections.abc import Iterator
 
 import pymupdf
 
 from src.models import EmbeddedChunk, TextChunk
+from src.prompts import REWRITE_SYSTEM_PROMPT
 
 
 class FakeUploadedFile(io.BytesIO):
@@ -80,13 +82,28 @@ class KeywordFakeEmbeddingModel:
 
 class FixedAnswerChatModel:
     """
-    Fake chat model that returns a fixed answer and records whether it was called.
+    Fake chat model that returns a fixed answer and records every call.
+
+    Requests to rewrite a follow-up question get the rewrite text instead, so
+    tests can check which question was used for retrieval.
     """
 
-    def __init__(self, answer: str) -> None:
+    def __init__(self, answer: str, rewrite: str = "Rewritten standalone question?") -> None:
         self.answer = answer
+        self.rewrite = rewrite
         self.was_called = False
         self.last_messages: list[dict[str, str]] = []
+        self.calls: list[list[dict[str, str]]] = []
+
+    def _reply(self, messages: list[dict[str, str]]) -> str:
+        self.was_called = True
+        self.last_messages = messages
+        self.calls.append(messages)
+
+        if messages[0]["content"] == REWRITE_SYSTEM_PROMPT:
+            return self.rewrite
+
+        return self.answer
 
     def generate_answer(
         self,
@@ -94,9 +111,19 @@ class FixedAnswerChatModel:
         model: str,
         temperature: float = 0.0,
     ) -> str:
-        self.was_called = True
-        self.last_messages = messages
-        return self.answer
+        return self._reply(messages)
+
+    def stream_answer(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        temperature: float = 0.0,
+    ) -> Iterator[str]:
+        reply = self._reply(messages)
+        words = reply.split(" ")
+
+        for index, word in enumerate(words):
+            yield word if index == len(words) - 1 else f"{word} "
 
 
 def make_embedded_chunk(

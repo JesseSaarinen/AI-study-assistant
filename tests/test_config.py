@@ -140,3 +140,22 @@ def test_get_config_uses_evaluated_default_threshold(monkeypatch) -> None:
     config = get_config()
 
     assert config.retrieval_distance_threshold == DEFAULT_RETRIEVAL_DISTANCE_THRESHOLD
+
+
+def test_get_config_reads_chat_history_turns(monkeypatch) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.delenv("CHAT_HISTORY_TURNS", raising=False)
+
+    assert get_config().chat_history_turns == 3
+
+    monkeypatch.setenv("CHAT_HISTORY_TURNS", "0")
+
+    assert get_config().chat_history_turns == 0
+
+
+def test_get_config_rejects_negative_chat_history_turns(monkeypatch) -> None:
+    set_base_env(monkeypatch)
+    monkeypatch.setenv("CHAT_HISTORY_TURNS", "-1")
+
+    with pytest.raises(ValueError):
+        get_config()

@@ -1,6 +1,18 @@
-from src.models import RetrievedChunk
+import re
+
+from src.models import ChatTurn, RetrievedChunk
 
 ANSWER_NOT_FOUND = "I could not find this in the uploaded notes."
+
+# Earlier answers are shortened in the rewrite prompt. The rewrite only needs
+# to know what was discussed, not every detail of the answer.
+HISTORY_ANSWER_MAX_CHARS = 400
+
+CITATION_MARKER_PATTERN = re.compile(r"\s*\[\s*Sources?\s+[^\]]*\]", re.IGNORECASE)
+
+# The "Sources: [Source 1], [Source 2]" line that is appended when the model
+# forgets to cite.
+APPENDED_SOURCES_PATTERN = re.compile(r"\s*Sources:(\s*\[Source \d+\],?)+\s*$")
 
 
 SYSTEM_PROMPT = f"""
@@ -82,6 +94,89 @@ Answering instructions:
         {
             "role": "system",
             "content": SYSTEM_PROMPT,
+        },
+        {
+            "role": "user",
+            "content": user_prompt,
+        },
+    ]
+
+
+REWRITE_SYSTEM_PROMPT = """
+You rewrite follow-up questions so they can be used to search lecture notes.
+
+Given a conversation between a student and a study assistant, and the student's
+latest question, write one standalone question that a search engine could
+answer without seeing the conversation.
+
+Rules:
+1. Replace words such as "it", "that" or "the second one" with the topic they refer to.
+2. If the latest question is already standalone, return it unchanged.
+3. Keep the language of the latest question.
+4. Do not answer the question.
+5. Return only the rewritten question, with no quotes, labels or explanation.
+""".strip()
+
+
+def _shorten(text: str, max_chars: int) -> str:
+    cleaned = " ".join(text.split())
+
+    if len(cleaned) <= max_chars:
+        return cleaned
+
+    return cleaned[: max_chars - 3].rstrip() + "..."
+
+
+def strip_citation_markers(text: str) -> str:
+    """
+    Remove [Source N] markers and an appended "Sources:" line from an answer.
+    """
+
+    without_appended_line = APPENDED_SOURCES_PATTERN.sub("", text)
+
+    return CITATION_MARKER_PATTERN.sub("", without_appended_line).strip()
+
+
+def build_conversation_transcript(history: list[ChatTurn]) -> str:
+    """
+    Format earlier turns as a compact transcript for the rewrite prompt.
+
+    Citation markers are removed because [Source N] labels only make sense
+    next to the sources of the turn they came from.
+    """
+
+    lines: list[str] = []
+
+    for turn in history:
+        answer = strip_citation_markers(turn.answer.answer)
+        lines.append(f"Student: {_shorten(turn.question, HISTORY_ANSWER_MAX_CHARS)}")
+        lines.append(f"Assistant: {_shorten(answer, HISTORY_ANSWER_MAX_CHARS)}")
+
+    return "\n".join(lines)
+
+
+def build_rewrite_messages(
+    question: str,
+    history: list[ChatTurn],
+) -> list[dict[str, str]]:
+    """
+    Build chat messages that turn a follow-up question into a standalone one.
+    """
+
+    user_prompt = f"""
+Conversation so far:
+{build_conversation_transcript(history)}
+
+Latest question:
+{question}
+
+Standalone question:
+""".strip()
+
+    return [
+        {
+            "role": "system",
+            "content": REWRITE_SYSTEM_PROMPT,
         },
         {
             "role": "user",

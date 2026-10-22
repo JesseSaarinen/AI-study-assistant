@@ -16,11 +16,12 @@ It is a retrieval-augmented generation (RAG) app built with Streamlit, ChromaDB,
 ## Highlights
 
 - **Grounded answers with page citations.** Answers cite `[Source N]` markers, and the UI shows the file, page and retrieved text behind each one.
+- **A conversation, not a search box.** Follow-up questions such as "why is that?" are rewritten into standalone questions before retrieval, and answers stream in as they are generated.
 - **Says "I could not find this in the uploaded notes."** when retrieval finds nothing relevant, without calling the chat model at all.
 - **Measured, not guessed.** A labelled question set and an evaluation script compare embedding models, chunk sizes and distance thresholds, and the results set the app's defaults. [Results below](#retrieval-evaluation).
 - **Light enough for free hosting.** Embeddings run on ONNX Runtime through FastEmbed, so the install is about 1 GB instead of 6.6 GB with PyTorch.
 - **Ready for a public demo.** Bundled sample notes, one-click example questions, and a demo mode that isolates each visitor's notes and caps API usage.
-- **Tested.** 119 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
+- **Tested.** 150 pytest tests cover every module, the full pipeline and the Streamlit UI, with no network calls. CI runs ruff and the tests on every pull request and every push to `main`.
 
 ## How it works
 
@@ -34,22 +35,24 @@ flowchart LR
     end
 
     subgraph Question answering
-        Q[Question] --> QE[Embed question]
+        Q[Question] --> RW[Rewrite follow-up<br/>using recent turns]
+        RW --> QE[Embed question]
         QE --> R[Top-k retrieval]
         E --> R
         R --> F{Any chunk under<br/>distance threshold?}
         F -- no --> NF[Not found in notes]
         F -- yes --> P[Grounded prompt<br/>with Source labels]
         P --> L[OpenAI-compatible<br/>chat model]
-        L --> AN[Answer with<br/>citations]
+        L --> AN[Streamed answer<br/>with citations]
     end
 ```
 
 1. **Extract.** PyMuPDF reads the selectable text of each page. Empty, oversized, non-PDF and scanned files are reported per file, so one bad upload does not stop the rest.
 2. **Chunk.** Each page is split on its own into overlapping chunks that break at paragraph, sentence or word boundaries. Chunks never cross pages, so every chunk has exactly one page number to cite.
 3. **Embed and store.** Chunks are embedded with `all-MiniLM-L6-v2`, normalised, and stored in ChromaDB with their file name and page number.
-4. **Retrieve.** The question is embedded the same way and the closest chunks are fetched. Chunks above `RETRIEVAL_DISTANCE_THRESHOLD` are dropped.
-5. **Answer.** The remaining chunks go into a prompt that labels them `[Source 1]`, `[Source 2]` and so on, and tells the model to answer only from them. If the model forgets to cite, the retrieved source labels are appended to the answer.
+4. **Rewrite follow-ups.** When the conversation already has turns, the chat model rewrites the new question into a standalone one, so "why is that?" becomes "Why does a dynamic array double its capacity?". The rewritten question is shown above the answer.
+5. **Retrieve.** The question is embedded the same way and the closest chunks are fetched. Chunks above `RETRIEVAL_DISTANCE_THRESHOLD` are dropped.
+6. **Answer.** The remaining chunks go into a prompt that labels them `[Source 1]`, `[Source 2]` and so on, and tells the model to answer only from them. The answer streams into the chat as it is generated. If the model forgets to cite, the retrieved source labels are appended to the answer.
 
 ## Quick start
 
@@ -93,7 +96,7 @@ The app has three tabs that follow the pipeline:
 
 1. **Process notes.** Upload PDFs and process them end to end, or load the bundled sample notes. An advanced panel runs each stage on its own, which is handy for debugging or for showing how RAG works.
 2. **Inspect data.** Browse the extracted pages, chunks, embedding vectors and the records stored in ChromaDB.
-3. **Ask questions.** Ask about the stored notes. Each answer lists its citations and the retrieved chunks with their distance scores, with the cited ones marked.
+3. **Ask questions.** Chat about the stored notes and ask follow-up questions. Under each answer, a sources panel lists the citations and the retrieved chunks with their distance scores, with the cited ones marked.
 
 ![Upload and processing](docs/AI-assistant-uploadfile-example.png)
 
@@ -120,6 +123,7 @@ Findings:
 
 - **Chunks never cross page boundaries.** It costs a little context at page edges, but every chunk maps to one page, so a citation always points to a page the student can open.
 - **Cosine distance on normalised vectors.** Distances stay between 0 and 2 regardless of text length, which makes a single threshold meaningful across documents.
+- **History rewrites the question, it does not answer it.** Earlier turns are used only to turn a follow-up into a standalone question. The answer prompt holds that question and freshly retrieved chunks, so every `[Source N]` the model sees belongs to the current answer, and a long conversation does not grow the prompt. If the rewrite fails, the original question is used.
 - **Filter before the model, not after.** If no chunk is close enough, the app returns the not-found message without an API call. That is cheaper, and it removes the main source of hallucinated answers: weakly related context.
 - **FastEmbed instead of Sentence Transformers.** The same model runs on ONNX Runtime, which removes PyTorch and its CUDA libraries from the install. Swapping models is one setting, and the evaluation script shows what each choice costs.
 - **Any OpenAI-compatible API.** Free tiers and local models work with no code changes, which matters for students without a paid API account.
@@ -137,8 +141,8 @@ AI-study-assistant/
 │   ├── embeddings.py       # FastEmbed (ONNX) embedding model wrapper
 │   ├── vector_store.py     # ChromaDB storage and retrieval
 │   ├── ingestion.py        # extract → chunk → embed → store
-│   ├── prompts.py          # grounded system and user prompts
-│   ├── rag_pipeline.py     # retrieval and answer generation
+│   ├── prompts.py          # grounded answer and follow-up rewrite prompts
+│   ├── rag_pipeline.py     # rewrite, retrieval and streamed answers
 │   ├── citations.py        # [Source N] parsing and formatting
 │   ├── evaluation.py       # hit rate, MRR and threshold metrics
 │   ├── config.py           # environment-based settings with validation
@@ -175,13 +179,14 @@ All settings are environment variables, read from `.env` locally or from Streaml
 | `CHROMA_COLLECTION_NAME` | `study_notes` | ChromaDB collection name |
 | `DEMO_MODE` | `false` | Per-session collections and a question cap for public demos |
 | `DEMO_MAX_QUESTIONS` | `20` | Questions per session in demo mode |
+| `CHAT_HISTORY_TURNS` | `3` | Earlier turns used to rewrite follow-up questions, `0` turns rewriting off |
 
 For notes in Finnish or other languages, set `EMBEDDING_MODEL_NAME=paraphrase-multilingual-MiniLM-L12-v2`, lower `CHUNK_SIZE` to around 500, and process the PDFs again. The distance of every retrieved chunk is shown in the UI, which helps when tuning the threshold for your own notes.
 
 ## Testing
 
 ```bash
-pytest                                  # 119 tests, no network access needed
+pytest                                  # 150 tests, no network access needed
 pytest --cov --cov-report=term-missing  # with coverage
 ruff check . && ruff format --check .   # lint and format
 python scripts/evaluate_retrieval.py    # retrieval evaluation, downloads the models
@@ -202,7 +207,7 @@ The app deploys for free on Streamlit Community Cloud with a free Gemini or Groq
 - **Privacy.** Retrieved note text is sent to the configured chat provider. Use Ollama to keep everything on your machine.
 - **Single user locally.** There are no accounts, and outside demo mode all notes share one collection.
 
-Ideas for next steps: OCR for scanned notes, separate collections per course, deleting single documents, chat history, and generated flashcards or quizzes.
+Ideas for next steps: OCR for scanned notes, separate collections per course, deleting single documents, and generated flashcards or quizzes.
 
 ## License
 
