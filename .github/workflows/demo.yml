@@ -36,7 +36,7 @@ jobs:
           # The last step pushes the recording to the pull request branch.
           persist-credentials: true
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
